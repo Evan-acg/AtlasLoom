@@ -9,5 +9,13 @@
     "trailingComma": "none",
     "htmlWhitespaceSensitivity": "ignore",
     "singleAttributePerLine": true,
-    "endOfLine": "auto"
+    "endOfLine": "auto",
+    "overrides": [
+        {
+            "files": "**/*.scss",
+            "options": {
+                "parser": "scss"
+            }
+        }
+    ]
 }
