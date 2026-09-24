@@ -1,6 +1,7 @@
 const pascalCase = '[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)*'
+const scopePattern = `(?:${pascalCase}|[A-Z]{2,})`
 const headerPattern = new RegExp(
-    `^(?<type>${pascalCase})\\((?<scope>${pascalCase})\\): (?<subject>\\S(?:.*\\S)?)$`,
+    `^(?<type>${pascalCase})\\((?<scope>${scopePattern})\\): (?<subject>\\S(?:.*\\S)?)$`,
     'u'
 )
 const chineseCharacter = /\p{Script=Han}/u
@@ -12,7 +13,10 @@ export default {
                 'atlasloom-header-format': ({ header }) => {
                     const match = headerPattern.exec(header ?? '')
                     if (!match) {
-                        return [false, 'header must match Type(Scope): 中文描述 using PascalCase']
+                        return [
+                            false,
+                            'header must match Type(Scope): 中文描述 using PascalCase or uppercase acronym scope'
+                        ]
                     }
 
                     return [
