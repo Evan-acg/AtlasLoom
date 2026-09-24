@@ -167,6 +167,7 @@
         () => characters.value.find((character) => character.id === selectedCharacterId.value) ?? null
     )
     const allTags = computed(() => [...new Set(projectCharacters.value.flatMap((character) => character.tags))])
+    const totalCharacterCount = computed(() => characters.value.length)
     const filteredCharacters = computed(() => {
         const query = searchQuery.value.trim().toLocaleLowerCase()
         return projectCharacters.value.filter((character) => {
@@ -253,6 +254,18 @@
         selectedTags.value = selectedTags.value.includes(tag)
             ? selectedTags.value.filter((selected) => selected !== tag)
             : [...selectedTags.value, tag]
+    }
+
+    function projectCoverClass(projectId: string) {
+        if (projectId === 'mist-harbor') return 'project-cover--harbor'
+        if (projectId === 'falling-stars') return 'project-cover--stars'
+        if (projectId === 'paper-kite') return 'project-cover--kite'
+        return 'project-cover--default'
+    }
+
+    function projectOrdinal(projectId: string) {
+        const ordinal = projects.value.findIndex((project) => project.id === projectId) + 1
+        return String(ordinal).padStart(2, '0')
     }
 
     function startProjectCreation() {
@@ -344,18 +357,18 @@
 <template>
     <main class="workspace-prototype min-h-screen bg-canvas-soft px-4 pb-12 text-ink sm:px-8">
         <header
-            class="mx-auto flex max-w-[1000px] flex-wrap items-center justify-between gap-4 border-b border-hairline py-5"
+            class="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 rounded-2xl bg-secondary px-6 py-5 text-white shadow-sm sm:px-8"
         >
             <div>
-                <p class="text-xs font-semibold tracking-wide text-primary">AtlasLoom · 创作工作区</p>
-                <h1 class="mt-1 text-xl font-semibold">人物档案</h1>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">AtlasLoom · 创作工作区</p>
+                <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white">人物档案</h1>
             </div>
-            <p class="rounded-full border border-hairline bg-white px-3 py-2 text-xs text-ink-muted">
+            <p class="rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/80">
                 层级导航原型 · 样例数据仅在内存中
             </p>
         </header>
 
-        <div class="mx-auto max-w-[1000px] py-8">
+        <div class="mx-auto max-w-[1200px] py-8 sm:py-10">
             <nav
                 aria-label="档案层级"
                 class="mb-8 flex flex-wrap items-center gap-2 text-sm"
@@ -407,42 +420,70 @@
             >
                 <div class="flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <p class="text-sm text-ink-muted">第 1 层 · 选择一个创作项目</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            项目资料库 · 第 1 层
+                        </p>
                         <h2
                             id="project-list-title"
-                            class="mt-1 text-3xl font-semibold tracking-tight"
+                            class="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl"
                         >
                             你的项目
                         </h2>
+                        <p class="mt-3 max-w-2xl text-base leading-7 text-ink-secondary">
+                            每个创作世界都有独立的角色档案库。选择一个项目，继续浏览其中的人物。
+                        </p>
                     </div>
-                    <button
-                        class="min-h-11 rounded-lg bg-primary px-5 font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        type="button"
-                        @click="startProjectCreation"
-                    >
-                        ＋ 新建项目
-                    </button>
+                    <div class="flex items-center gap-4">
+                        <div class="hidden text-right sm:block">
+                            <p class="text-2xl font-semibold leading-none">{{ projects.length }}</p>
+                            <p class="mt-1 text-xs text-ink-muted">个创作项目</p>
+                            <p class="mt-1 text-xs text-ink-faint">{{ totalCharacterCount }} 份角色档案</p>
+                        </div>
+                        <button
+                            class="min-h-12 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            type="button"
+                            @click="startProjectCreation"
+                        >
+                            ＋ 新建项目
+                        </button>
+                    </div>
                 </div>
-                <div class="mt-7 grid gap-4 md:grid-cols-2">
+                <div class="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     <button
                         v-for="project in projects"
                         :key="project.id"
-                        class="min-h-40 rounded-xl border border-hairline bg-white p-6 text-left transition hover:border-primary hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="project-card overflow-hidden rounded-2xl border border-hairline bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         @click="openProject(project)"
                     >
-                        <span class="flex items-start justify-between gap-4">
-                            <span class="text-xl font-semibold">{{ project.name }}</span>
-                            <span class="text-sm text-ink-muted">
-                                {{ characters.filter((character) => character.projectId === project.id).length }} 位角色
+                        <span
+                            class="project-cover"
+                            :class="projectCoverClass(project.id)"
+                        >
+                            <span class="relative z-10 flex items-center justify-between gap-3">
+                                <span class="project-index">PROJECT {{ projectOrdinal(project.id) }}</span>
+                                <span class="text-sm font-medium text-white/85">
+                                    {{ characters.filter((character) => character.projectId === project.id).length }}
+                                    位角色
+                                </span>
+                            </span>
+                            <span
+                                class="relative z-10 block text-3xl font-semibold tracking-tight text-white sm:text-[32px]"
+                            >
+                                {{ project.name }}
                             </span>
                         </span>
-                        <span class="mt-3 block max-w-xl text-sm leading-6 text-ink-muted">
-                            {{ project.description }}
-                        </span>
-                        <span class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                            进入项目
-                            <span aria-hidden="true">→</span>
+                        <span class="block p-5 sm:p-6">
+                            <span class="block text-base leading-7 text-ink-secondary">{{ project.description }}</span>
+                            <span class="mt-5 flex items-center justify-between border-t border-hairline pt-4">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                                    角色档案库
+                                </span>
+                                <span class="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                                    进入项目
+                                    <span aria-hidden="true">→</span>
+                                </span>
+                            </span>
                         </span>
                     </button>
                 </div>
@@ -788,7 +829,7 @@
 
 <style scoped>
     .workspace-prototype {
-        --prototype-canvas: #f6f5f4;
+        --prototype-canvas: #e6e0d8;
         --prototype-surface: #ffffff;
         --prototype-primary: #0075de;
         --prototype-primary-active: #005bab;
@@ -835,5 +876,72 @@
 
     .workspace-prototype .border-hairline {
         border-color: var(--prototype-hairline);
+    }
+
+    .project-cover {
+        position: relative;
+        isolation: isolate;
+        display: flex;
+        min-height: 190px;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+        padding: 24px;
+        color: #ffffff;
+    }
+
+    .project-cover::before,
+    .project-cover::after {
+        position: absolute;
+        z-index: 0;
+        border: 1px solid rgb(255 255 255 / 22%);
+        border-radius: 9999px;
+        content: '';
+        pointer-events: none;
+    }
+
+    .project-cover::before {
+        right: -48px;
+        bottom: -142px;
+        width: 286px;
+        height: 286px;
+    }
+
+    .project-cover::after {
+        right: 42px;
+        bottom: -184px;
+        width: 218px;
+        height: 218px;
+        background-color: rgb(255 255 255 / 8%);
+    }
+
+    .project-cover--harbor {
+        background: linear-gradient(135deg, #123b4a 0%, #176a73 100%);
+    }
+
+    .project-cover--stars {
+        background: linear-gradient(135deg, #292357 0%, #6950a9 100%);
+    }
+
+    .project-cover--kite {
+        background: linear-gradient(135deg, #75392f 0%, #c16c3c 100%);
+    }
+
+    .project-cover--default {
+        background: linear-gradient(135deg, #213183 0%, #355eae 100%);
+    }
+
+    .project-index {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        border: 1px solid rgb(255 255 255 / 26%);
+        border-radius: 9999px;
+        background-color: rgb(0 0 0 / 13%);
+        padding: 0 10px;
+        color: rgb(255 255 255 / 88%);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
     }
 </style>
