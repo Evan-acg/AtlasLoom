@@ -364,81 +364,46 @@
         </header>
 
         <div class="mx-auto max-w-[1280px] py-7 sm:py-9">
-            <nav
-                aria-label="档案层级"
-                class="mb-8 flex flex-wrap items-center gap-2 text-sm"
-            >
-                <button
-                    class="min-h-10 rounded-lg px-3 font-medium"
-                    :class="level === 'projects' ? 'bg-white text-primary' : 'text-ink-muted hover:bg-white'"
-                    type="button"
-                    @click="backToProjects"
-                >
-                    项目
-                </button>
-                <span
-                    aria-hidden="true"
-                    class="text-ink-faint"
-                >
-                    /
-                </span>
-                <button
-                    v-if="level !== 'projects' && currentProject"
-                    class="min-h-10 rounded-lg px-3 font-medium"
-                    :class="level === 'characters' ? 'bg-white text-primary' : 'text-ink-muted hover:bg-white'"
-                    type="button"
-                    :disabled="level === 'characters'"
-                    @click="backToCharacters"
-                >
-                    角色列表
-                </button>
-                <template v-if="level === 'profile' && currentCharacter">
-                    <span
-                        aria-hidden="true"
-                        class="text-ink-faint"
-                    >
-                        /
-                    </span>
-                    <span class="px-3 py-2 font-medium text-ink">{{ currentCharacter.name }}</span>
-                </template>
-                <span
-                    v-if="level === 'projects'"
-                    class="px-3 py-2 font-medium text-ink-muted"
-                >
-                    全部项目
-                </span>
-            </nav>
-
             <section
                 v-if="level === 'projects'"
                 aria-labelledby="project-list-title"
+                class="overflow-hidden rounded-lg border border-hairline bg-white"
             >
-                <div class="flex flex-wrap items-center justify-between gap-4">
+                <header
+                    class="flex flex-wrap items-center justify-between gap-4 border-b border-hairline px-4 py-4 sm:px-6"
+                >
                     <div>
-                        <p class="text-xs font-semibold tracking-wide text-primary">项目 · 第 1 层</p>
+                        <nav
+                            aria-label="当前位置"
+                            class="mb-1 flex items-center gap-2 text-xs text-ink-muted"
+                        >
+                            <span>项目</span>
+                            <span aria-hidden="true">/</span>
+                            <span class="font-medium text-ink">全部项目</span>
+                        </nav>
                         <h2
                             id="project-list-title"
-                            class="mt-1 text-3xl font-semibold tracking-tight"
+                            class="text-2xl font-semibold tracking-tight"
                         >
                             创作项目
                         </h2>
                     </div>
                     <button
-                        class="min-h-10 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="min-h-9 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         @click="startProjectCreation"
                     >
                         ＋ 新建项目
                     </button>
-                </div>
+                </header>
 
-                <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.8fr)]">
+                <div class="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.8fr)]">
                     <section
-                        class="overflow-hidden rounded-lg border border-hairline bg-white"
+                        class="min-w-0 px-3 py-4 sm:px-5"
                         aria-label="项目列表"
                     >
-                        <div class="flex items-center justify-between border-b border-hairline px-4 py-3 sm:px-5">
-                            <h3 class="text-sm font-semibold">全部项目</h3>
+                        <div class="flex items-center justify-between border-b border-hairline px-2 pb-3">
+                            <h3 class="text-sm font-semibold">项目列表</h3>
                             <span class="text-xs text-ink-muted">{{ projects.length }} 个项目</span>
                         </div>
                         <div
@@ -501,7 +466,7 @@
 
                     <aside
                         v-if="projectPreview"
-                        class="rounded-lg border border-hairline bg-white p-5 sm:p-6"
+                        class="border-t border-hairline bg-canvas-soft px-5 py-5 sm:px-6 lg:border-l lg:border-t-0"
                         aria-label="选中项目摘要"
                     >
                         <p class="text-xs font-semibold tracking-wide text-ink-muted">当前选中项目</p>
@@ -528,29 +493,45 @@
             <section
                 v-else-if="level === 'characters' && currentProject"
                 aria-labelledby="character-list-title"
+                class="overflow-hidden rounded-lg border border-hairline bg-white"
             >
-                <div class="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <p class="text-sm text-ink-muted">第 2 层 · {{ currentProject.name }}</p>
-                        <h2
-                            id="character-list-title"
-                            class="mt-1 text-3xl font-semibold tracking-tight"
-                        >
-                            角色列表
-                        </h2>
-                        <p class="mt-2 text-sm text-ink-muted">{{ currentProject.description }}</p>
-                    </div>
-                    <button
-                        class="min-h-11 rounded-lg bg-primary px-5 font-semibold text-white hover:bg-primary-active"
-                        type="button"
-                        @click="startCharacterEditing"
+                <header class="border-b border-hairline px-4 py-4 sm:px-6">
+                    <nav
+                        aria-label="当前位置"
+                        class="mb-2 flex items-center gap-2 text-xs text-ink-muted"
                     >
-                        ＋ 新建角色
-                    </button>
-                </div>
-                <div class="mt-6 rounded-xl border border-hairline bg-white p-4 sm:p-5">
+                        <button
+                            class="hover:text-primary"
+                            type="button"
+                            @click="backToProjects"
+                        >
+                            项目
+                        </button>
+                        <span aria-hidden="true">/</span>
+                        <span class="font-medium text-ink">{{ currentProject.name }}</span>
+                    </nav>
+                    <div class="flex flex-wrap items-end justify-between gap-4">
+                        <div>
+                            <h2
+                                id="character-list-title"
+                                class="text-2xl font-semibold tracking-tight"
+                            >
+                                角色列表
+                            </h2>
+                            <p class="mt-1 text-sm text-ink-muted">{{ currentProject.description }}</p>
+                        </div>
+                        <button
+                            class="min-h-9 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active"
+                            type="button"
+                            @click="startCharacterEditing"
+                        >
+                            ＋ 新建角色
+                        </button>
+                    </div>
+                </header>
+                <div class="border-b border-hairline px-4 py-4 sm:px-6">
                     <label
-                        class="flex min-h-11 items-center gap-3 rounded-lg border border-hairline px-3 focus-within:border-primary"
+                        class="flex min-h-10 items-center gap-3 rounded-md border border-hairline px-3 focus-within:border-primary"
                     >
                         <span
                             aria-hidden="true"
@@ -572,7 +553,7 @@
                         <button
                             v-for="tag in allTags"
                             :key="tag"
-                            class="min-h-9 rounded-full border px-3 text-xs font-medium"
+                            class="min-h-8 rounded-md border px-2.5 text-xs font-medium"
                             :class="
                                 selectedTags.includes(tag)
                                     ? 'border-primary bg-primary text-white'
@@ -588,7 +569,7 @@
                 </div>
                 <div
                     v-if="filteredCharacters.length"
-                    class="mt-5 divide-y divide-hairline rounded-xl border border-hairline bg-white px-5"
+                    class="divide-y divide-hairline px-4 sm:px-6"
                 >
                     <button
                         v-for="character in filteredCharacters"
@@ -630,7 +611,7 @@
                 </div>
                 <div
                     v-else
-                    class="mt-5 rounded-xl border border-hairline bg-white px-6 py-12 text-center"
+                    class="px-6 py-10 text-center"
                 >
                     <p class="font-semibold">没有找到角色</p>
                     <p class="mt-2 text-sm text-ink-muted">调整搜索条件，或为这个项目创建一个新角色。</p>
@@ -647,71 +628,99 @@
             <article
                 v-else-if="level === 'profile' && currentProject && currentCharacter"
                 aria-labelledby="profile-title"
+                class="overflow-hidden rounded-lg border border-hairline bg-white"
             >
-                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-hairline pb-6">
-                    <div>
-                        <p class="text-sm text-ink-muted">第 3 层 · {{ currentProject.name }} / 角色档案</p>
-                        <h2
-                            id="profile-title"
-                            class="mt-2 text-4xl font-semibold tracking-tight"
-                        >
-                            {{ currentCharacter.name }}
-                        </h2>
-                        <p class="mt-2 text-sm text-ink-muted">
-                            {{ currentCharacter.aliases.join(' · ') || '暂无别名' }}
-                        </p>
-                    </div>
-                    <div class="flex gap-2">
+                <header class="border-b border-hairline px-4 py-4 sm:px-6">
+                    <nav
+                        aria-label="当前位置"
+                        class="mb-3 flex flex-wrap items-center gap-2 text-xs text-ink-muted"
+                    >
                         <button
-                            class="min-h-11 rounded-lg border border-hairline bg-white px-4 font-semibold hover:bg-canvas-soft"
+                            class="hover:text-primary"
+                            type="button"
+                            @click="backToProjects"
+                        >
+                            项目
+                        </button>
+                        <span aria-hidden="true">/</span>
+                        <button
+                            class="hover:text-primary"
                             type="button"
                             @click="backToCharacters"
                         >
-                            返回角色列表
+                            {{ currentProject.name }}
                         </button>
-                        <button
-                            class="min-h-11 rounded-lg bg-primary px-4 font-semibold text-white hover:bg-primary-active"
-                            type="button"
-                            @click="startCharacterEditing(currentCharacter)"
-                        >
-                            编辑档案
-                        </button>
+                        <span aria-hidden="true">/</span>
+                        <span class="font-medium text-ink">{{ currentCharacter.name }}</span>
+                    </nav>
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h2
+                                id="profile-title"
+                                class="text-2xl font-semibold tracking-tight"
+                            >
+                                {{ currentCharacter.name }}
+                            </h2>
+                            <p class="mt-1 text-sm text-ink-muted">
+                                {{ currentCharacter.aliases.join(' · ') || '暂无别名' }}
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                type="button"
+                                @click="backToCharacters"
+                            >
+                                返回列表
+                            </button>
+                            <button
+                                class="min-h-9 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-active"
+                                type="button"
+                                @click="startCharacterEditing(currentCharacter)"
+                            >
+                                编辑档案
+                            </button>
+                        </div>
                     </div>
+                </header>
+                <section class="border-b border-hairline px-4 py-5 sm:px-6">
+                    <p class="border-l-2 border-primary pl-4 text-base leading-7 text-ink-secondary">
+                        {{ currentCharacter.introduction }}
+                    </p>
+                </section>
+                <div class="grid sm:grid-cols-2">
+                    <section class="border-b border-hairline p-4 sm:border-r sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">外貌</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.appearance }}</p>
+                    </section>
+                    <section class="border-b border-hairline p-4 sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">性格</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.personality }}</p>
+                    </section>
+                    <section class="border-b border-hairline p-4 sm:border-r sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">背景故事</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.backstory }}</p>
+                    </section>
+                    <section class="border-b border-hairline p-4 sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">目标 / 动机</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.motivation }}</p>
+                    </section>
+                    <section class="border-b border-hairline p-4 sm:border-r sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">能力</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.abilities }}</p>
+                    </section>
+                    <section class="border-b border-hairline p-4 sm:p-5">
+                        <h3 class="text-xs font-semibold text-ink-muted">备注</h3>
+                        <p class="mt-2 text-sm leading-6">{{ currentCharacter.notes }}</p>
+                    </section>
                 </div>
-                <p class="mt-7 max-w-3xl text-lg leading-8 text-ink-secondary">{{ currentCharacter.introduction }}</p>
-                <div class="mt-8 grid gap-5 sm:grid-cols-2">
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">外貌</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.appearance }}</p>
-                    </section>
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">性格</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.personality }}</p>
-                    </section>
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">背景故事</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.backstory }}</p>
-                    </section>
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">目标 / 动机</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.motivation }}</p>
-                    </section>
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">能力</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.abilities }}</p>
-                    </section>
-                    <section class="rounded-xl border border-hairline bg-white p-5">
-                        <h3 class="text-sm font-semibold text-ink-muted">备注</h3>
-                        <p class="mt-3 leading-7">{{ currentCharacter.notes }}</p>
-                    </section>
-                </div>
-                <section class="mt-5 rounded-xl border border-hairline bg-white p-5">
-                    <h3 class="text-sm font-semibold text-ink-muted">标签</h3>
-                    <div class="mt-3 flex flex-wrap gap-2">
+                <section class="px-4 py-4 sm:px-6">
+                    <h3 class="text-xs font-semibold text-ink-muted">标签</h3>
+                    <div class="mt-2 flex flex-wrap gap-2">
                         <span
                             v-for="tag in currentCharacter.tags"
                             :key="tag"
-                            class="rounded-full bg-canvas-soft px-3 py-1.5 text-xs text-ink-secondary"
+                            class="rounded-md bg-canvas-soft px-2.5 py-1 text-xs text-ink-secondary"
                         >
                             {{ tag }}
                         </span>
