@@ -14,4 +14,4 @@ Use the single-context layout. See `.agents/docs/agents/domain.md`.
 
 ## UI design
 
-Follow the root `design.md` for UI implementation and visual changes.
+Follow the root `DESIGN.md` for UI implementation and visual changes.
