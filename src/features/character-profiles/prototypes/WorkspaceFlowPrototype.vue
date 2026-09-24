@@ -160,6 +160,7 @@
     const currentProject = computed(
         () => projects.value.find((project) => project.id === selectedProjectId.value) ?? null
     )
+    const projectPreview = computed(() => currentProject.value ?? projects.value[0] ?? null)
     const projectCharacters = computed(() =>
         characters.value.filter((character) => character.projectId === selectedProjectId.value)
     )
@@ -167,7 +168,6 @@
         () => characters.value.find((character) => character.id === selectedCharacterId.value) ?? null
     )
     const allTags = computed(() => [...new Set(projectCharacters.value.flatMap((character) => character.tags))])
-    const totalCharacterCount = computed(() => characters.value.length)
     const filteredCharacters = computed(() => {
         const query = searchQuery.value.trim().toLocaleLowerCase()
         return projectCharacters.value.filter((character) => {
@@ -256,16 +256,8 @@
             : [...selectedTags.value, tag]
     }
 
-    function projectCoverClass(projectId: string) {
-        if (projectId === 'mist-harbor') return 'project-cover--harbor'
-        if (projectId === 'falling-stars') return 'project-cover--stars'
-        if (projectId === 'paper-kite') return 'project-cover--kite'
-        return 'project-cover--default'
-    }
-
-    function projectOrdinal(projectId: string) {
-        const ordinal = projects.value.findIndex((project) => project.id === projectId) + 1
-        return String(ordinal).padStart(2, '0')
+    function selectProjectPreview(projectId: string) {
+        selectedProjectId.value = projectId
     }
 
     function startProjectCreation() {
@@ -356,19 +348,22 @@
 
 <template>
     <main class="workspace-prototype min-h-screen bg-canvas-soft px-4 pb-12 text-ink sm:px-8">
-        <header
-            class="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 rounded-2xl bg-secondary px-6 py-5 text-white shadow-sm sm:px-8"
-        >
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">AtlasLoom · 创作工作区</p>
-                <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white">人物档案</h1>
+        <header class="-mx-4 bg-secondary px-4 py-4 text-white sm:-mx-8 sm:px-8">
+            <div class="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-4">
+                    <div class="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-sm font-bold text-white">
+                        A
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold tracking-wide text-white">AtlasLoom</p>
+                        <p class="mt-0.5 text-xs text-white/65">创作工作区</p>
+                    </div>
+                </div>
+                <span class="text-xs text-white/65">本地资料 · 原型预览</span>
             </div>
-            <p class="rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/80">
-                层级导航原型 · 样例数据仅在内存中
-            </p>
         </header>
 
-        <div class="mx-auto max-w-[1200px] py-8 sm:py-10">
+        <div class="mx-auto max-w-[1280px] py-7 sm:py-9">
             <nav
                 aria-label="档案层级"
                 class="mb-8 flex flex-wrap items-center gap-2 text-sm"
@@ -388,7 +383,7 @@
                     /
                 </span>
                 <button
-                    v-if="currentProject"
+                    v-if="level !== 'projects' && currentProject"
                     class="min-h-10 rounded-lg px-3 font-medium"
                     :class="level === 'characters' ? 'bg-white text-primary' : 'text-ink-muted hover:bg-white'"
                     type="button"
@@ -407,7 +402,7 @@
                     <span class="px-3 py-2 font-medium text-ink">{{ currentCharacter.name }}</span>
                 </template>
                 <span
-                    v-if="!currentProject"
+                    v-if="level === 'projects'"
                     class="px-3 py-2 font-medium text-ink-muted"
                 >
                     全部项目
@@ -418,88 +413,115 @@
                 v-if="level === 'projects'"
                 aria-labelledby="project-list-title"
             >
-                <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                            项目资料库 · 第 1 层
-                        </p>
+                        <p class="text-xs font-semibold tracking-wide text-primary">项目 · 第 1 层</p>
                         <h2
                             id="project-list-title"
-                            class="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl"
+                            class="mt-1 text-3xl font-semibold tracking-tight"
                         >
-                            你的项目
+                            创作项目
                         </h2>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-ink-secondary">
-                            每个创作世界都有独立的角色档案库。选择一个项目，继续浏览其中的人物。
-                        </p>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <div class="hidden text-right sm:block">
-                            <p class="text-2xl font-semibold leading-none">{{ projects.length }}</p>
-                            <p class="mt-1 text-xs text-ink-muted">个创作项目</p>
-                            <p class="mt-1 text-xs text-ink-faint">{{ totalCharacterCount }} 份角色档案</p>
-                        </div>
-                        <button
-                            class="min-h-12 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                            type="button"
-                            @click="startProjectCreation"
-                        >
-                            ＋ 新建项目
-                        </button>
-                    </div>
-                </div>
-                <div class="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     <button
-                        v-for="project in projects"
-                        :key="project.id"
-                        class="project-card overflow-hidden rounded-2xl border border-hairline bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        type="button"
-                        @click="openProject(project)"
-                    >
-                        <span
-                            class="project-cover"
-                            :class="projectCoverClass(project.id)"
-                        >
-                            <span class="relative z-10 flex items-center justify-between gap-3">
-                                <span class="project-index">PROJECT {{ projectOrdinal(project.id) }}</span>
-                                <span class="text-sm font-medium text-white/85">
-                                    {{ characters.filter((character) => character.projectId === project.id).length }}
-                                    位角色
-                                </span>
-                            </span>
-                            <span
-                                class="relative z-10 block text-3xl font-semibold tracking-tight text-white sm:text-[32px]"
-                            >
-                                {{ project.name }}
-                            </span>
-                        </span>
-                        <span class="block p-5 sm:p-6">
-                            <span class="block text-base leading-7 text-ink-secondary">{{ project.description }}</span>
-                            <span class="mt-5 flex items-center justify-between border-t border-hairline pt-4">
-                                <span class="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                                    角色档案库
-                                </span>
-                                <span class="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                                    进入项目
-                                    <span aria-hidden="true">→</span>
-                                </span>
-                            </span>
-                        </span>
-                    </button>
-                </div>
-                <div
-                    v-if="projects.length === 0"
-                    class="mt-7 rounded-xl border border-hairline bg-white px-6 py-12 text-center"
-                >
-                    <p class="text-lg font-semibold">还没有创作项目</p>
-                    <p class="mt-2 text-sm text-ink-muted">创建一个项目，再添加属于它的角色档案。</p>
-                    <button
-                        class="mt-5 min-h-11 rounded-lg bg-primary px-5 font-semibold text-white"
+                        class="min-h-10 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         @click="startProjectCreation"
                     >
-                        创建第一个项目
+                        ＋ 新建项目
                     </button>
+                </div>
+
+                <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.8fr)]">
+                    <section
+                        class="overflow-hidden rounded-lg border border-hairline bg-white"
+                        aria-label="项目列表"
+                    >
+                        <div class="flex items-center justify-between border-b border-hairline px-4 py-3 sm:px-5">
+                            <h3 class="text-sm font-semibold">全部项目</h3>
+                            <span class="text-xs text-ink-muted">{{ projects.length }} 个项目</span>
+                        </div>
+                        <div
+                            v-if="projects.length"
+                            class="divide-y divide-hairline"
+                        >
+                            <div
+                                v-for="project in projects"
+                                :key="project.id"
+                                class="flex items-center gap-3 px-3 py-3 sm:px-4"
+                            >
+                                <button
+                                    class="flex min-h-16 min-w-0 flex-1 items-center gap-3 border-l-2 px-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
+                                    :class="
+                                        project.id === projectPreview?.id
+                                            ? 'border-l-primary bg-canvas-soft'
+                                            : 'border-l-transparent hover:bg-canvas-soft/70'
+                                    "
+                                    type="button"
+                                    :aria-pressed="project.id === projectPreview?.id"
+                                    @click="selectProjectPreview(project.id)"
+                                >
+                                    <span
+                                        class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-canvas-soft text-sm font-semibold text-ink-secondary"
+                                    >
+                                        {{ project.name.slice(0, 1) }}
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate text-base font-semibold">{{ project.name }}</span>
+                                        <span class="mt-1 block truncate text-sm text-ink-muted">
+                                            {{ project.description }}
+                                        </span>
+                                    </span>
+                                    <span class="hidden shrink-0 text-xs text-ink-muted sm:block">
+                                        {{
+                                            characters.filter((character) => character.projectId === project.id).length
+                                        }}
+                                        位角色
+                                    </span>
+                                </button>
+                                <button
+                                    class="min-h-9 shrink-0 rounded-md px-3 text-sm font-semibold text-primary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-primary"
+                                    type="button"
+                                    :aria-label="`打开项目：${project.name}`"
+                                    @click="openProject(project)"
+                                >
+                                    打开
+                                    <span aria-hidden="true">→</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            v-else
+                            class="px-5 py-10 text-center"
+                        >
+                            <p class="font-semibold">还没有创作项目</p>
+                            <p class="mt-1 text-sm text-ink-muted">创建一个项目，再添加属于它的角色档案。</p>
+                        </div>
+                    </section>
+
+                    <aside
+                        v-if="projectPreview"
+                        class="rounded-lg border border-hairline bg-white p-5 sm:p-6"
+                        aria-label="选中项目摘要"
+                    >
+                        <p class="text-xs font-semibold tracking-wide text-ink-muted">当前选中项目</p>
+                        <h3 class="mt-2 text-2xl font-semibold tracking-tight">{{ projectPreview.name }}</h3>
+                        <p class="mt-2 text-sm leading-6 text-ink-secondary">{{ projectPreview.description }}</p>
+                        <div class="mt-5 border-t border-hairline pt-4">
+                            <p class="text-xs text-ink-muted">角色档案</p>
+                            <p class="mt-1 text-xl font-semibold">
+                                {{ characters.filter((character) => character.projectId === projectPreview.id).length }}
+                                <span class="text-sm font-normal text-ink-muted">位角色</span>
+                            </p>
+                        </div>
+                        <button
+                            class="mt-5 min-h-10 w-full rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            type="button"
+                            @click="openProject(projectPreview)"
+                        >
+                            打开项目
+                        </button>
+                    </aside>
                 </div>
             </section>
 
@@ -829,7 +851,7 @@
 
 <style scoped>
     .workspace-prototype {
-        --prototype-canvas: #e6e0d8;
+        --prototype-canvas: #f1f2f4;
         --prototype-surface: #ffffff;
         --prototype-primary: #0075de;
         --prototype-primary-active: #005bab;
@@ -876,72 +898,5 @@
 
     .workspace-prototype .border-hairline {
         border-color: var(--prototype-hairline);
-    }
-
-    .project-cover {
-        position: relative;
-        isolation: isolate;
-        display: flex;
-        min-height: 190px;
-        flex-direction: column;
-        justify-content: space-between;
-        overflow: hidden;
-        padding: 24px;
-        color: #ffffff;
-    }
-
-    .project-cover::before,
-    .project-cover::after {
-        position: absolute;
-        z-index: 0;
-        border: 1px solid rgb(255 255 255 / 22%);
-        border-radius: 9999px;
-        content: '';
-        pointer-events: none;
-    }
-
-    .project-cover::before {
-        right: -48px;
-        bottom: -142px;
-        width: 286px;
-        height: 286px;
-    }
-
-    .project-cover::after {
-        right: 42px;
-        bottom: -184px;
-        width: 218px;
-        height: 218px;
-        background-color: rgb(255 255 255 / 8%);
-    }
-
-    .project-cover--harbor {
-        background: linear-gradient(135deg, #123b4a 0%, #176a73 100%);
-    }
-
-    .project-cover--stars {
-        background: linear-gradient(135deg, #292357 0%, #6950a9 100%);
-    }
-
-    .project-cover--kite {
-        background: linear-gradient(135deg, #75392f 0%, #c16c3c 100%);
-    }
-
-    .project-cover--default {
-        background: linear-gradient(135deg, #213183 0%, #355eae 100%);
-    }
-
-    .project-index {
-        display: inline-flex;
-        min-height: 28px;
-        align-items: center;
-        border: 1px solid rgb(255 255 255 / 26%);
-        border-radius: 9999px;
-        background-color: rgb(0 0 0 / 13%);
-        padding: 0 10px;
-        color: rgb(255 255 255 / 88%);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.14em;
     }
 </style>
