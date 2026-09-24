@@ -342,7 +342,7 @@
 </script>
 
 <template>
-    <main class="min-h-screen bg-canvas-soft px-4 pb-12 text-ink sm:px-8">
+    <main class="workspace-prototype min-h-screen bg-canvas-soft px-4 pb-12 text-ink sm:px-8">
         <header
             class="mx-auto flex max-w-[1000px] flex-wrap items-center justify-between gap-4 border-b border-hairline py-5"
         >
@@ -513,7 +513,7 @@
                             :class="
                                 selectedTags.includes(tag)
                                     ? 'border-primary bg-primary text-white'
-                                    : 'border-hairline text-ink-secondary hover:border-primary'
+                                    : 'border-hairline bg-white text-ink-secondary hover:border-primary'
                             "
                             type="button"
                             :aria-pressed="selectedTags.includes(tag)"
@@ -785,3 +785,55 @@
         </div>
     </main>
 </template>
+
+<style scoped>
+    .workspace-prototype {
+        --prototype-canvas: #f6f5f4;
+        --prototype-surface: #ffffff;
+        --prototype-primary: #0075de;
+        --prototype-primary-active: #005bab;
+        --prototype-ink: #000000;
+        --prototype-ink-secondary: #31302e;
+        --prototype-ink-muted: #615d59;
+        --prototype-hairline: #e6e6e6;
+
+        background-color: var(--prototype-canvas);
+        color: var(--prototype-ink);
+    }
+
+    .workspace-prototype .bg-canvas-soft {
+        background-color: var(--prototype-canvas);
+    }
+
+    .workspace-prototype .bg-white {
+        background-color: var(--prototype-surface);
+    }
+
+    .workspace-prototype .bg-primary {
+        background-color: var(--prototype-primary);
+    }
+
+    .workspace-prototype .bg-primary:hover {
+        background-color: var(--prototype-primary-active);
+    }
+
+    .workspace-prototype .text-primary {
+        color: var(--prototype-primary);
+    }
+
+    .workspace-prototype .text-white {
+        color: #ffffff;
+    }
+
+    .workspace-prototype .text-ink-secondary {
+        color: var(--prototype-ink-secondary);
+    }
+
+    .workspace-prototype .text-ink-muted {
+        color: var(--prototype-ink-muted);
+    }
+
+    .workspace-prototype .border-hairline {
+        border-color: var(--prototype-hairline);
+    }
+</style>
