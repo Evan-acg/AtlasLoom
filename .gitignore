@@ -13,3 +13,6 @@ coverage/
 
 # pnpm 调试日志
 pnpm-debug.log*
+
+# Playwright 临时输出
+.playwright-cli/

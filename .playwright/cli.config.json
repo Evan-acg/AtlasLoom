@@ -1,0 +1,23 @@
+{
+    "browser": {
+        "browserName": "chromium",
+        "isolated": true,
+        "launchOptions": {
+            "headless": true
+        },
+        "contextOptions": {
+            "viewport": {
+                "width": 1440,
+                "height": 900
+            }
+        }
+    },
+    "outputMode": "stdout",
+    "console": {
+        "level": "error"
+    },
+    "timeouts": {
+        "action": 5000,
+        "navigation": 15000
+    }
+}
