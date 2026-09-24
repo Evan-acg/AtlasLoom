@@ -1,5 +1,19 @@
+<script setup lang="ts">
+    import { computed } from 'vue'
+    import { WorkspacePrototype } from '@/features/character-profiles'
+
+    const showWorkspacePrototype = computed(
+        () => import.meta.env.DEV && new globalThis.URLSearchParams(globalThis.location.search).has('variant')
+    )
+</script>
+
 <template>
-    <main class="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:px-10 sm:py-24">
+    <WorkspacePrototype v-if="showWorkspacePrototype" />
+
+    <main
+        v-else
+        class="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:px-10 sm:py-24"
+    >
         <section class="mx-auto max-w-2xl">
             <p class="mb-3 text-sm font-semibold uppercase tracking-widest text-indigo-600">
                 Vue 3 · TypeScript · Pinia
