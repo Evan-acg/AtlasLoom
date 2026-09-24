@@ -160,7 +160,6 @@
     const currentProject = computed(
         () => projects.value.find((project) => project.id === selectedProjectId.value) ?? null
     )
-    const projectPreview = computed(() => currentProject.value ?? projects.value[0] ?? null)
     const projectCharacters = computed(() =>
         characters.value.filter((character) => character.projectId === selectedProjectId.value)
     )
@@ -254,10 +253,6 @@
         selectedTags.value = selectedTags.value.includes(tag)
             ? selectedTags.value.filter((selected) => selected !== tag)
             : [...selectedTags.value, tag]
-    }
-
-    function selectProjectPreview(projectId: string) {
-        selectedProjectId.value = projectId
     }
 
     function startProjectCreation() {
@@ -397,96 +392,44 @@
                     </button>
                 </header>
 
-                <div class="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.8fr)]">
-                    <section
-                        class="min-w-0 px-3 py-4 sm:px-5"
-                        aria-label="项目列表"
+                <div class="px-3 py-2 sm:px-5">
+                    <div
+                        class="hidden grid-cols-[minmax(0,1fr)_120px_100px] items-center border-b border-hairline px-4 py-2 text-xs font-medium text-ink-muted sm:grid"
                     >
-                        <div class="flex items-center justify-between border-b border-hairline px-2 pb-3">
-                            <h3 class="text-sm font-semibold">项目列表</h3>
-                            <span class="text-xs text-ink-muted">{{ projects.length }} 个项目</span>
-                        </div>
-                        <div
-                            v-if="projects.length"
-                            class="divide-y divide-hairline"
-                        >
-                            <div
-                                v-for="project in projects"
-                                :key="project.id"
-                                class="flex items-center gap-3 px-3 py-3 sm:px-4"
-                            >
-                                <button
-                                    class="flex min-h-16 min-w-0 flex-1 items-center gap-3 border-l-2 px-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
-                                    :class="
-                                        project.id === projectPreview?.id
-                                            ? 'border-l-primary bg-canvas-soft'
-                                            : 'border-l-transparent hover:bg-canvas-soft/70'
-                                    "
-                                    type="button"
-                                    :aria-pressed="project.id === projectPreview?.id"
-                                    @click="selectProjectPreview(project.id)"
-                                >
-                                    <span
-                                        class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-canvas-soft text-sm font-semibold text-ink-secondary"
-                                    >
-                                        {{ project.name.slice(0, 1) }}
-                                    </span>
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-base font-semibold">{{ project.name }}</span>
-                                        <span class="mt-1 block truncate text-sm text-ink-muted">
-                                            {{ project.description }}
-                                        </span>
-                                    </span>
-                                    <span class="hidden shrink-0 text-xs text-ink-muted sm:block">
-                                        {{
-                                            characters.filter((character) => character.projectId === project.id).length
-                                        }}
-                                        位角色
-                                    </span>
-                                </button>
-                                <button
-                                    class="min-h-9 shrink-0 rounded-md px-3 text-sm font-semibold text-primary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-primary"
-                                    type="button"
-                                    :aria-label="`打开项目：${project.name}`"
-                                    @click="openProject(project)"
-                                >
-                                    打开
-                                    <span aria-hidden="true">→</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div
-                            v-else
-                            class="px-5 py-10 text-center"
-                        >
-                            <p class="font-semibold">还没有创作项目</p>
-                            <p class="mt-1 text-sm text-ink-muted">创建一个项目，再添加属于它的角色档案。</p>
-                        </div>
-                    </section>
-
-                    <aside
-                        v-if="projectPreview"
-                        class="border-t border-hairline bg-canvas-soft px-5 py-5 sm:px-6 lg:border-l lg:border-t-0"
-                        aria-label="选中项目摘要"
+                        <span>项目</span>
+                        <span>角色档案</span>
+                        <span class="text-right">操作</span>
+                    </div>
+                    <div
+                        v-if="projects.length"
+                        class="divide-y divide-hairline"
                     >
-                        <p class="text-xs font-semibold tracking-wide text-ink-muted">当前选中项目</p>
-                        <h3 class="mt-2 text-2xl font-semibold tracking-tight">{{ projectPreview.name }}</h3>
-                        <p class="mt-2 text-sm leading-6 text-ink-secondary">{{ projectPreview.description }}</p>
-                        <div class="mt-5 border-t border-hairline pt-4">
-                            <p class="text-xs text-ink-muted">角色档案</p>
-                            <p class="mt-1 text-xl font-semibold">
-                                {{ characters.filter((character) => character.projectId === projectPreview.id).length }}
-                                <span class="text-sm font-normal text-ink-muted">位角色</span>
-                            </p>
-                        </div>
                         <button
-                            class="mt-5 min-h-10 w-full rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            v-for="project in projects"
+                            :key="project.id"
+                            class="grid min-h-18 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 text-left hover:bg-canvas-soft/70 focus-visible:outline-2 focus-visible:outline-primary sm:grid-cols-[minmax(0,1fr)_120px_100px]"
                             type="button"
-                            @click="openProject(projectPreview)"
+                            @click="openProject(project)"
                         >
-                            打开项目
+                            <span class="min-w-0">
+                                <span class="block truncate text-base font-semibold">{{ project.name }}</span>
+                                <span class="mt-1 block truncate text-sm text-ink-muted">
+                                    {{ project.description }}
+                                </span>
+                            </span>
+                            <span class="hidden text-sm text-ink-secondary sm:block">
+                                {{ characters.filter((character) => character.projectId === project.id).length }} 位角色
+                            </span>
+                            <span class="justify-self-end text-sm font-semibold text-primary">打开 →</span>
                         </button>
-                    </aside>
+                    </div>
+                    <div
+                        v-else
+                        class="px-4 py-10 text-center"
+                    >
+                        <p class="font-semibold">还没有创作项目</p>
+                        <p class="mt-1 text-sm text-ink-muted">创建一个项目，再添加属于它的角色档案。</p>
+                    </div>
                 </div>
             </section>
 
