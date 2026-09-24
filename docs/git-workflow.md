@@ -7,6 +7,11 @@
 - `dev`：日常开发集成线。
 - `master`：稳定发布线，也是 GitHub 默认分支。
 
+禁止直接在 `dev` 或 `master` 上开发、修改代码或提交代码。开始任何开发或修改前，必须先更新对应基准分支，再从它派生工作分支：
+
+- 普通功能、缺陷修复、文档和维护：从 `dev` 派生。
+- 已发布内容的紧急修复：从 `master` 派生。
+
 普通变更必须从 `dev` 派生：
 
 - `feature/<issue>-<short-name>`：功能
@@ -20,6 +25,17 @@
 - `hotfix/<issue>-<short-name>`：已发布内容的紧急修复
 
 上述工作分支在 PR 合并后删除。`dev` 和 `master` 不得删除、改写历史或 force push。
+
+远端工作分支由 GitHub 在 PR 合并后自动删除。本地工作分支不会被远程自动删除，开发者必须在 PR 合并后切回基准分支并删除本地工作分支：
+
+```bash
+git fetch origin --prune
+git switch <base-branch>
+git pull --ff-only
+git branch -d <work-branch>
+```
+
+其中 `<base-branch>` 是本次 PR 的目标分支，`<work-branch>` 是已合并的本地工作分支。若本地分支仍有未合并提交，必须先确认是否需要保留，不得使用 `-D` 强制删除。
 
 ## Issue 与 PR
 
@@ -40,7 +56,7 @@
 - 普通工作分支通过 PR 合并到 `dev`。
 - 发布通过单独的 `dev -> master` 发布 PR。
 - PR 使用 Squash merge，避免把工作分支历史带入主线。
-- PR 合并后自动删除工作分支。
+- PR 合并后自动删除远端工作分支，并按本节步骤删除本地工作分支。
 - 合并前必须通过 `lint`、`typecheck`、`test` 和 `build`。
 - CI 失败时不得绕过合并。只有基础设施故障或已确认的测试环境问题可以由维护者临时豁免，并在 PR 中记录原因、影响和后续补修 Issue。
 
