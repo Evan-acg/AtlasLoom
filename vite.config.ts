@@ -3,8 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
 
 export default defineConfig({
-  plugins: [vue(), UnoCSS()],
-  test: {
-    include: ['src/**/*.spec.ts'],
-  },
+    plugins: [vue(), UnoCSS()],
+    test: {
+        include: ['src/**/*.spec.ts']
+    }
 })
