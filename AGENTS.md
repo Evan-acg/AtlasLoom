@@ -4,6 +4,8 @@
 
 Issues and specs live in this repo's GitHub Issues; use `gh`. See `.agents/docs/agents/issue-tracker.md`.
 
+When asked what to work on next in this repo or to choose an existing task, inspect GitHub Issues before routing to a skill. List open issues, read the relevant map/spec/tickets, and verify readiness, assignees, and blockers/dependencies with `gh`. Recommend the next clearly ready, unassigned ticket with no open blockers; if multiple candidates are equally eligible, present them for the user to choose. Use `/grill-with-docs` for a new idea that is not already represented by an issue.
+
 ### Triage labels
 
 Use the default five triage labels. See `.agents/docs/agents/triage-labels.md`.
