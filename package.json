@@ -15,7 +15,7 @@
         "typecheck": "vue-tsc --noEmit",
         "lint": "eslint . && pnpm run lint:styles",
         "lint:styles": "stylelint \"src/**/*.scss\"",
-        "browser:install": "playwright-cli install-browser chromium && playwright install chromium",
+        "browser:install": "playwright install chromium",
         "test:e2e": "playwright test",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
