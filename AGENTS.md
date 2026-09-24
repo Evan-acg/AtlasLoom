@@ -30,3 +30,10 @@ Follow the root `DESIGN.md` for UI implementation and visual changes.
 - For page-level layout changes, inspect 375×812, 768×1024, 1024×768, 1280×800, and 1440×900 viewports. For small component changes, inspect 1–2 relevant sizes.
 - Change viewport dimensions with `pnpm exec playwright-cli -s=atlasloom resize <width> <height>`.
 - Close the named browser session with `pnpm exec playwright-cli -s=atlasloom close` when finished. Run `pnpm browser:install` if Chromium is not installed.
+
+## Command execution
+
+- Run commands that finish on their own in the foreground with a maximum wait of 2 minutes. If a command reaches that limit, stop it and report the timeout.
+- Commands that keep running or wait for ongoing input (such as `pnpm dev`, watchers, and interactive processes) must be started in the background so the agent is not blocked waiting for them to exit. Ensure the launch command itself returns promptly.
+- After background startup, use short, bounded commands to check process status or service readiness; each check is subject to the 2-minute limit.
+- Run an over-2-minute finite command in the background and poll for completion only when the user explicitly authorizes that exception for the task.
