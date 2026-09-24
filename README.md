@@ -6,13 +6,13 @@
 
 ## What is AtlasLoom?
 
-AtlasLoom is a public, early-stage web application project. It currently provides a runnable Vue application scaffold and a small counter example demonstrating client-side routing and Pinia state. Product-specific workflows have not been added yet.
+AtlasLoom is a public, early-stage web application project. It currently provides a runnable Vue application shell with client-side routing and Pinia configured for future feature state. Product-specific workflows have not been added yet.
 
 ## Current capabilities
 
 - Vue 3 and TypeScript application scaffold powered by Vite
 - Vue Router history-mode routing with a not-found page
-- Pinia counter example with in-memory state
+- Pinia ready for feature-owned application state
 - UnoCSS utilities with the Wind3 preset
 
 ## Quick start
@@ -29,7 +29,7 @@ pnpm install
 pnpm dev
 ```
 
-Open the local URL printed by Vite. Use **增加计数** to try the counter, or visit an unknown path to see the not-found page.
+Open the local URL printed by Vite to see the starter home page. Visit an unknown path to see the not-found page.
 
 ## Contributing and feedback
 

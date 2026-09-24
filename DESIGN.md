@@ -178,7 +178,7 @@ components:
 
 AtlasLoom uses a warm, paper-like canvas and a quiet neutral interface. Inter typography establishes hierarchy; a single confident blue identifies primary actions and links. Hairline borders and restrained elevation separate content without making the interface feel heavy.
 
-This is the target design system for new and changed UI. The existing counter page is a starter example and may not yet reflect every token below. Product-specific layouts should use these foundations without copying reference-site marketing sections or decorative assets.
+This is the target design system for new and changed UI. The current home page is a starter shell and may not yet reflect every token below. Product-specific layouts should use these foundations without copying reference-site marketing sections or decorative assets.
 
 The color aliases and `font-sans` family are configured in `uno.config.ts` as extensions to `presetWind3()`. They add project tokens without replacing Wind3's built-in palette, spacing, sizing, or responsive utilities.
 
