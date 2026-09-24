@@ -28,3 +28,17 @@ Closes #
 
 - [ ] 已评估是否需要额外审查者
 - [ ] 架构、数据模型或破坏性变更已邀请额外审查者（如适用）
+
+## 分支生命周期
+
+- [ ] 本次修改未直接发生在 `dev` 或 `master`，工作分支从正确的基准分支派生
+- [ ] PR 合并后将切回目标分支并删除本地工作分支
+
+合并完成后执行：
+
+```bash
+git fetch origin --prune
+git switch <base-branch>
+git pull --ff-only
+git branch -d <work-branch>
+```
