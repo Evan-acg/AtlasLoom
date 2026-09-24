@@ -3,7 +3,9 @@
     import { WorkspacePrototype } from '@/features/character-profiles'
 
     const showWorkspacePrototype = computed(
-        () => import.meta.env.DEV && new globalThis.URLSearchParams(globalThis.location.search).has('variant')
+        () =>
+            import.meta.env.DEV &&
+            new globalThis.URLSearchParams(globalThis.location.search).get('prototype') === 'workspace'
     )
 </script>
 

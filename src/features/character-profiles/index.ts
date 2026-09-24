@@ -1,1 +1,1 @@
-export { default as WorkspacePrototype } from './prototypes/WorkspacePrototype.vue'
+export { default as WorkspacePrototype } from './prototypes/WorkspaceFlowPrototype.vue'
