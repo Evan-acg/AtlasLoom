@@ -1,23 +1,40 @@
 # AtlasLoom
 
-Vue 3 + TypeScript + Pinia starter application powered by Vite.
+> An early-stage Vue 3 single-page application scaffold with TypeScript and Pinia.
 
-## Requirements
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## What is AtlasLoom?
+
+AtlasLoom is a public, early-stage web application project. It currently provides a runnable Vue application scaffold and a small counter example demonstrating client-side routing and Pinia state. Product-specific workflows have not been added yet.
+
+## Current capabilities
+
+- Vue 3 and TypeScript application scaffold powered by Vite
+- Vue Router history-mode routing with a not-found page
+- Pinia counter example with in-memory state
+- UnoCSS utilities with the Wind3 preset
+
+## Quick start
+
+### Requirements
 
 - Node.js `>=22.12`
 - pnpm `11.9.0`
 
-## Commands
+### Install and run
 
-- `pnpm install` — install dependencies
-- `pnpm dev` — start the development server
-- `pnpm test` — run unit tests
-- `pnpm typecheck` — check TypeScript and Vue types
-- `pnpm lint` — lint the project
-- `pnpm format` — format project files
-- `pnpm build` — type-check and build for production
-- `pnpm preview` — preview the production build locally
+```sh
+pnpm install
+pnpm dev
+```
 
-## Commit messages
+Open the local URL printed by Vite. Use **增加计数** to try the counter, or visit an unknown path to see the not-found page.
 
-Commit messages must follow `Type(Scope): 中文描述`, with `Type` and `Scope` in PascalCase and a Chinese description. For example: `Feat(UserProfile): 新增用户资料页`.
+## Contributing and feedback
+
+Bug reports, ideas, and pull requests are welcome. Use [GitHub Issues](https://github.com/Evan-acg/AtlasLoom/issues) to report a problem or discuss a substantial change, and [Pull Requests](https://github.com/Evan-acg/AtlasLoom/pulls) to contribute.
+
+## License
+
+AtlasLoom is licensed under the [MIT License](LICENSE).
