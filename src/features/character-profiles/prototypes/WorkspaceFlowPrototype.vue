@@ -4,10 +4,16 @@
     // One explicit drill-down: project index -> that project's character list -> one full character profile.
     // All sample records and edits remain in memory; this prototype never persists data.
     type Level = 'projects' | 'characters' | 'profile'
+    interface HistoryEntry {
+        at: string
+        summary: string
+    }
     interface Project {
         id: string
         name: string
         description: string
+        deletedAt?: string
+        history?: HistoryEntry[]
     }
     interface Character {
         id: string
@@ -22,6 +28,8 @@
         abilities: string
         notes: string
         tags: string[]
+        deletedAt?: string
+        history?: HistoryEntry[]
     }
 
     const projects = ref<Project[]>([
@@ -156,6 +164,18 @@
     const characterNameDraft = ref('')
     const characterIntroductionDraft = ref('')
     const formError = ref('')
+    const showDeletedProjects = ref(false)
+    const showDeletedCharacters = ref(false)
+    const showProjectHistory = ref(false)
+    const showCharacterHistory = ref(false)
+    function recordChange(record: Project | Character, summary: string) {
+        record.history ??= [{ at: '2026/09/18 09:00', summary: 'projectId' in record ? '创建角色' : '创建项目' }]
+        record.history.unshift({ at: new Date().toLocaleString('zh-CN', { hour12: false }), summary })
+    }
+
+    const visibleProjects = computed(() =>
+        projects.value.filter((project) => Boolean(project.deletedAt) === showDeletedProjects.value)
+    )
 
     const currentProject = computed(
         () => projects.value.find((project) => project.id === selectedProjectId.value) ?? null
@@ -163,13 +183,22 @@
     const projectCharacters = computed(() =>
         characters.value.filter((character) => character.projectId === selectedProjectId.value)
     )
+    const visibleCharacters = computed(() =>
+        projectCharacters.value.filter((character) => Boolean(character.deletedAt) === showDeletedCharacters.value)
+    )
     const currentCharacter = computed(
         () => characters.value.find((character) => character.id === selectedCharacterId.value) ?? null
     )
-    const allTags = computed(() => [...new Set(projectCharacters.value.flatMap((character) => character.tags))])
+    const projectHistory = computed<HistoryEntry[]>(
+        () => currentProject.value?.history ?? [{ at: '2026/09/18 09:00', summary: '创建项目' }]
+    )
+    const characterHistory = computed<HistoryEntry[]>(
+        () => currentCharacter.value?.history ?? [{ at: '2026/09/18 09:00', summary: '创建角色' }]
+    )
+    const allTags = computed(() => [...new Set(visibleCharacters.value.flatMap((character) => character.tags))])
     const filteredCharacters = computed(() => {
         const query = searchQuery.value.trim().toLocaleLowerCase()
-        return projectCharacters.value.filter((character) => {
+        return visibleCharacters.value.filter((character) => {
             const matchesQuery =
                 !query ||
                 [character.name, ...character.aliases, character.introduction].some((value) =>
@@ -188,7 +217,7 @@
         )
         const requestedLevel = params.get('level')
 
-        if (requestedLevel === 'profile' && requestedProject && requestedCharacter) {
+        if (requestedLevel === 'profile' && requestedProject && !requestedProject.deletedAt && requestedCharacter) {
             level.value = 'profile'
             selectedProjectId.value = requestedProject.id
             selectedCharacterId.value = requestedCharacter.id
@@ -224,12 +253,15 @@
         selectedCharacterId.value = ''
         searchQuery.value = ''
         selectedTags.value = []
+        showDeletedCharacters.value = false
+        showProjectHistory.value = false
         level.value = 'characters'
         writeUrl('characters', project.id, '')
     }
 
     function openCharacter(character: Character) {
         selectedCharacterId.value = character.id
+        showCharacterHistory.value = false
         level.value = 'profile'
         writeUrl('profile', character.projectId, character.id)
     }
@@ -240,6 +272,7 @@
         selectedCharacterId.value = ''
         searchQuery.value = ''
         selectedTags.value = []
+        showProjectHistory.value = false
         writeUrl('projects', '', '')
     }
 
@@ -253,6 +286,46 @@
         selectedTags.value = selectedTags.value.includes(tag)
             ? selectedTags.value.filter((selected) => selected !== tag)
             : [...selectedTags.value, tag]
+    }
+
+    function switchProjectList(deleted: boolean) {
+        showDeletedProjects.value = deleted
+    }
+
+    function switchCharacterList(deleted: boolean) {
+        showDeletedCharacters.value = deleted
+        searchQuery.value = ''
+        selectedTags.value = []
+    }
+
+    function deleteProject() {
+        if (!currentProject.value || currentProject.value.deletedAt) return
+        currentProject.value.deletedAt = new Date().toISOString()
+        recordChange(currentProject.value, '移至已删除项目')
+        showDeletedProjects.value = true
+        backToProjects()
+    }
+
+    function restoreProject() {
+        if (!currentProject.value?.deletedAt) return
+        currentProject.value.deletedAt = undefined
+        recordChange(currentProject.value, '恢复项目')
+        showDeletedProjects.value = false
+    }
+
+    function deleteCharacter() {
+        if (!currentCharacter.value || currentCharacter.value.deletedAt) return
+        currentCharacter.value.deletedAt = new Date().toISOString()
+        recordChange(currentCharacter.value, '移至已删除角色')
+        switchCharacterList(true)
+        backToCharacters()
+    }
+
+    function restoreCharacter() {
+        if (!currentCharacter.value?.deletedAt) return
+        currentCharacter.value.deletedAt = undefined
+        recordChange(currentCharacter.value, '恢复角色')
+        switchCharacterList(false)
     }
 
     function startProjectCreation() {
@@ -280,7 +353,12 @@
             formError.value = '项目名称已存在，请换一个名称。'
             return
         }
-        const project = { id: `project-${Date.now()}`, name, description: projectDescriptionDraft.value.trim() }
+        const project: Project = {
+            id: `project-${Date.now()}`,
+            name,
+            description: projectDescriptionDraft.value.trim(),
+            history: [{ at: new Date().toLocaleString('zh-CN', { hour12: false }), summary: '创建项目' }]
+        }
         projects.value.push(project)
         dialog.value = null
         openProject(project)
@@ -303,8 +381,13 @@
         if (editingCharacterId.value) {
             const character = characters.value.find((item) => item.id === editingCharacterId.value)
             if (character) {
+                const changes = [
+                    character.name !== name && '修改姓名',
+                    character.introduction !== characterIntroductionDraft.value.trim() && '修改简介'
+                ].filter(Boolean)
                 character.name = name
                 character.introduction = characterIntroductionDraft.value.trim()
+                if (changes.length) recordChange(character, changes.join('、'))
                 dialog.value = null
                 writeUrl('profile', selectedProjectId.value, character.id, true)
             }
@@ -321,7 +404,8 @@
                 motivation: '待补充',
                 abilities: '待补充',
                 notes: '待补充',
-                tags: []
+                tags: [],
+                history: [{ at: new Date().toLocaleString('zh-CN', { hour12: false }), summary: '创建角色' }]
             }
             characters.value.push(character)
             dialog.value = null
@@ -392,6 +476,34 @@
                     </button>
                 </header>
 
+                <div
+                    class="flex gap-2 border-b border-hairline px-4 py-3 sm:px-6"
+                    aria-label="项目状态"
+                >
+                    <button
+                        type="button"
+                        class="min-h-9 rounded-md px-3 text-sm font-medium"
+                        :class="
+                            !showDeletedProjects ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-canvas-soft'
+                        "
+                        :aria-pressed="!showDeletedProjects"
+                        @click="switchProjectList(false)"
+                    >
+                        使用中的项目
+                    </button>
+                    <button
+                        type="button"
+                        class="min-h-9 rounded-md px-3 text-sm font-medium"
+                        :class="
+                            showDeletedProjects ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-canvas-soft'
+                        "
+                        :aria-pressed="showDeletedProjects"
+                        @click="switchProjectList(true)"
+                    >
+                        已删除项目（{{ projects.filter((project) => project.deletedAt).length }}）
+                    </button>
+                </div>
+
                 <div class="px-3 py-2 sm:px-5">
                     <div
                         class="hidden grid-cols-[minmax(0,1fr)_120px_100px] items-center border-b border-hairline px-4 py-2 text-xs font-medium text-ink-muted sm:grid"
@@ -401,11 +513,11 @@
                         <span class="text-right">操作</span>
                     </div>
                     <div
-                        v-if="projects.length"
+                        v-if="visibleProjects.length"
                         class="divide-y divide-hairline"
                     >
                         <button
-                            v-for="project in projects"
+                            v-for="project in visibleProjects"
                             :key="project.id"
                             class="grid min-h-18 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 text-left hover:bg-canvas-soft/70 focus-visible:outline-2 focus-visible:outline-primary sm:grid-cols-[minmax(0,1fr)_120px_100px]"
                             type="button"
@@ -418,17 +530,31 @@
                                 </span>
                             </span>
                             <span class="hidden text-sm text-ink-secondary sm:block">
-                                {{ characters.filter((character) => character.projectId === project.id).length }} 位角色
+                                {{
+                                    characters.filter(
+                                        (character) => character.projectId === project.id && !character.deletedAt
+                                    ).length
+                                }}
+                                位角色
                             </span>
-                            <span class="justify-self-end text-sm font-semibold text-primary">打开 →</span>
+                            <span class="justify-self-end text-sm font-semibold text-primary">
+                                {{ project.deletedAt ? '查看与恢复 →' : '打开 →' }}
+                            </span>
                         </button>
                     </div>
                     <div
                         v-else
                         class="px-4 py-10 text-center"
                     >
-                        <p class="font-semibold">还没有创作项目</p>
-                        <p class="mt-1 text-sm text-ink-muted">创建一个项目，再添加属于它的角色档案。</p>
+                        <p class="font-semibold">
+                            {{ showDeletedProjects ? '没有已删除的项目' : '还没有创作项目' }}
+                        </p>
+                        <p
+                            v-if="!showDeletedProjects"
+                            class="mt-1 text-sm text-ink-muted"
+                        >
+                            创建一个项目，再添加属于它的角色档案。
+                        </p>
                     </div>
                 </div>
             </section>
@@ -463,16 +589,100 @@
                             </h2>
                             <p class="mt-1 text-sm text-ink-muted">{{ currentProject.description }}</p>
                         </div>
-                        <button
-                            class="min-h-9 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active"
-                            type="button"
-                            @click="startCharacterEditing"
-                        >
-                            ＋ 新建角色
-                        </button>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                :aria-expanded="showProjectHistory"
+                                @click="showProjectHistory = !showProjectHistory"
+                            >
+                                {{ showProjectHistory ? '收起项目历史' : '项目历史' }}
+                            </button>
+                            <button
+                                v-if="currentProject.deletedAt"
+                                type="button"
+                                class="min-h-9 rounded-md bg-primary px-3 text-sm font-semibold text-white"
+                                @click="restoreProject"
+                            >
+                                恢复项目
+                            </button>
+                            <template v-else>
+                                <button
+                                    type="button"
+                                    class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                    @click="deleteProject"
+                                >
+                                    删除项目
+                                </button>
+                                <button
+                                    class="min-h-9 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active"
+                                    type="button"
+                                    @click="startCharacterEditing"
+                                >
+                                    ＋ 新建角色
+                                </button>
+                            </template>
+                        </div>
                     </div>
                 </header>
-                <div class="border-b border-hairline px-4 py-4 sm:px-6">
+                <section
+                    v-if="showProjectHistory"
+                    class="border-b border-hairline px-4 py-4 sm:px-6"
+                    aria-label="项目变更历史"
+                >
+                    <h3 class="text-sm font-semibold">项目变更历史</h3>
+                    <ol class="mt-3 space-y-2">
+                        <li
+                            v-for="(entry, index) in projectHistory"
+                            :key="index"
+                            class="flex flex-wrap gap-x-4 text-sm"
+                        >
+                            <time class="text-ink-muted">{{ entry.at }}</time>
+                            <span>{{ entry.summary }}</span>
+                        </li>
+                    </ol>
+                </section>
+                <div
+                    v-if="currentProject.deletedAt"
+                    class="px-4 py-8 sm:px-6"
+                >
+                    <p class="font-semibold">这个项目已删除</p>
+                    <p class="mt-2 text-sm text-ink-muted">
+                        项目内的角色暂时不会显示；恢复项目后，原本未删除的角色会再次出现。
+                    </p>
+                </div>
+                <div
+                    v-if="!currentProject.deletedAt"
+                    class="flex gap-2 border-b border-hairline px-4 py-3 sm:px-6"
+                    aria-label="角色状态"
+                >
+                    <button
+                        type="button"
+                        class="min-h-9 rounded-md px-3 text-sm font-medium"
+                        :class="
+                            !showDeletedCharacters ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-canvas-soft'
+                        "
+                        :aria-pressed="!showDeletedCharacters"
+                        @click="switchCharacterList(false)"
+                    >
+                        使用中的角色
+                    </button>
+                    <button
+                        type="button"
+                        class="min-h-9 rounded-md px-3 text-sm font-medium"
+                        :class="
+                            showDeletedCharacters ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-canvas-soft'
+                        "
+                        :aria-pressed="showDeletedCharacters"
+                        @click="switchCharacterList(true)"
+                    >
+                        已删除角色（{{ projectCharacters.filter((character) => character.deletedAt).length }}）
+                    </button>
+                </div>
+                <div
+                    v-if="!currentProject.deletedAt"
+                    class="border-b border-hairline px-4 py-4 sm:px-6"
+                >
                     <label
                         class="flex min-h-10 items-center gap-3 rounded-md border border-hairline px-3 focus-within:border-primary"
                     >
@@ -511,7 +721,7 @@
                     </div>
                 </div>
                 <div
-                    v-if="filteredCharacters.length"
+                    v-if="!currentProject.deletedAt && filteredCharacters.length"
                     class="divide-y divide-hairline px-4 sm:px-6"
                 >
                     <button
@@ -528,6 +738,12 @@
                         </span>
                         <span class="min-w-0 flex-1">
                             <span class="block text-lg font-semibold">{{ character.name }}</span>
+                            <span
+                                v-if="character.deletedAt"
+                                class="mt-1 block text-xs text-ink-muted"
+                            >
+                                已删除 · 可以恢复
+                            </span>
                             <span class="mt-1 block truncate text-sm text-ink-muted">
                                 {{ character.aliases.join(' · ') || character.introduction }}
                             </span>
@@ -553,12 +769,20 @@
                     </button>
                 </div>
                 <div
-                    v-else
+                    v-else-if="!currentProject.deletedAt"
                     class="px-6 py-10 text-center"
                 >
-                    <p class="font-semibold">没有找到角色</p>
-                    <p class="mt-2 text-sm text-ink-muted">调整搜索条件，或为这个项目创建一个新角色。</p>
+                    <p class="font-semibold">
+                        {{ showDeletedCharacters ? '没有已删除的角色' : '没有找到角色' }}
+                    </p>
+                    <p
+                        v-if="!showDeletedCharacters"
+                        class="mt-2 text-sm text-ink-muted"
+                    >
+                        调整搜索条件，或为这个项目创建一个新角色。
+                    </p>
                     <button
+                        v-if="!showDeletedCharacters"
                         class="mt-5 min-h-11 rounded-lg border border-hairline px-4 font-semibold"
                         type="button"
                         @click="startCharacterEditing"
@@ -607,8 +831,14 @@
                             <p class="mt-1 text-sm text-ink-muted">
                                 {{ currentCharacter.aliases.join(' · ') || '暂无别名' }}
                             </p>
+                            <p
+                                v-if="currentCharacter.deletedAt"
+                                class="mt-2 text-sm font-medium text-ink-secondary"
+                            >
+                                已删除 · 档案仍可查看
+                            </p>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <button
                                 class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
                                 type="button"
@@ -617,15 +847,57 @@
                                 返回列表
                             </button>
                             <button
-                                class="min-h-9 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-active"
                                 type="button"
-                                @click="startCharacterEditing(currentCharacter)"
+                                class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                :aria-expanded="showCharacterHistory"
+                                @click="showCharacterHistory = !showCharacterHistory"
                             >
-                                编辑档案
+                                {{ showCharacterHistory ? '收起变更历史' : '变更历史' }}
                             </button>
+                            <button
+                                v-if="currentCharacter.deletedAt"
+                                type="button"
+                                class="min-h-9 rounded-md bg-primary px-3 text-sm font-semibold text-white"
+                                @click="restoreCharacter"
+                            >
+                                恢复角色
+                            </button>
+                            <template v-else>
+                                <button
+                                    type="button"
+                                    class="min-h-9 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                    @click="deleteCharacter"
+                                >
+                                    删除角色
+                                </button>
+                                <button
+                                    class="min-h-9 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-active"
+                                    type="button"
+                                    @click="startCharacterEditing(currentCharacter)"
+                                >
+                                    编辑档案
+                                </button>
+                            </template>
                         </div>
                     </div>
                 </header>
+                <section
+                    v-if="showCharacterHistory"
+                    class="border-b border-hairline px-4 py-4 sm:px-6"
+                    aria-label="角色变更历史"
+                >
+                    <h3 class="text-sm font-semibold">角色变更历史</h3>
+                    <ol class="mt-3 space-y-2">
+                        <li
+                            v-for="(entry, index) in characterHistory"
+                            :key="index"
+                            class="flex flex-wrap gap-x-4 text-sm"
+                        >
+                            <time class="text-ink-muted">{{ entry.at }}</time>
+                            <span>{{ entry.summary }}</span>
+                        </li>
+                    </ol>
+                </section>
                 <section class="border-b border-hairline px-4 py-5 sm:px-6">
                     <p class="border-l-2 border-primary pl-4 text-base leading-7 text-ink-secondary">
                         {{ currentCharacter.introduction }}
