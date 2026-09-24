@@ -1,0 +1,15 @@
+# 依赖目录
+node_modules/
+
+# 构建与测试产物
+dist/
+coverage/
+
+# 环境变量与本地配置
+.env
+.env.*
+!.env.example
+*.local
+
+# pnpm 调试日志
+pnpm-debug.log*
