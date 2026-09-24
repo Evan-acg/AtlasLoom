@@ -11,3 +11,7 @@ Use the default five triage labels. See `.agents/docs/agents/triage-labels.md`.
 ### Domain docs
 
 Use the single-context layout. See `.agents/docs/agents/domain.md`.
+
+## UI design
+
+Follow the root `design.md` for UI implementation and visual changes.
