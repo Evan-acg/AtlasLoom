@@ -1,0 +1,71 @@
+import { createServer as createHttpServer, type Server } from 'node:http'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createProjectApiMiddleware } from './project-api'
+
+describe('project API', () => {
+    let dataDirectory: string
+    let server: Server
+    let baseUrl: string
+
+    beforeEach(async () => {
+        dataDirectory = await mkdtemp(join(tmpdir(), 'atlasloom-project-api-'))
+        const middleware = createProjectApiMiddleware(dataDirectory)
+        server = createHttpServer((request, response) => {
+            void middleware(request, response)
+        })
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+        const address = server.address()
+        if (!address || typeof address === 'string') throw new Error('Test API did not open a TCP listener.')
+        baseUrl = `http://127.0.0.1:${address.port}`
+    })
+
+    afterEach(async () => {
+        await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+        await rm(dataDirectory, { recursive: true, force: true })
+    })
+
+    // Given an empty project data directory
+    // When the user creates a project through the local API
+    // Then the API returns it and writes its metadata to disk
+    it('creates and lists a project through the local API', async () => {
+        const response = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年', description: '群岛城市' })
+        })
+        const created = (await response.json()) as { project: { id: string; name: string; description: string } }
+        const metadata = JSON.parse(await readFile(join(dataDirectory, '雾港编年', 'metadata.json'), 'utf8')) as {
+            id: string
+        }
+        const listing = await fetch(`${baseUrl}/projects`)
+
+        expect(response.status).toBe(201)
+        expect(created.project).toMatchObject({ name: '雾港编年', description: '群岛城市' })
+        expect(metadata.id).toBe(created.project.id)
+        await expect(listing.json()).resolves.toMatchObject({ projects: [created.project], issues: [] })
+    })
+
+    // Given a project has already been created
+    // When the user submits another project with the same name
+    // Then the API rejects it with a conflict and keeps the existing project
+    it('reports duplicate project names as a conflict', async () => {
+        await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年', description: '' })
+        })
+        const duplicate = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年', description: '' })
+        })
+
+        expect(duplicate.status).toBe(409)
+        await expect(duplicate.json()).resolves.toMatchObject({ error: expect.stringContaining('已存在') })
+        const listing = await fetch(`${baseUrl}/projects`)
+        await expect(listing.json()).resolves.toMatchObject({ projects: [{ name: '雾港编年' }] })
+    })
+})

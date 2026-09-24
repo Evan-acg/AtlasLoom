@@ -11,6 +11,9 @@ $font-stack:
 $minimum-viewport-width: 320px;
 
 :root {
+    --atlasloom-primary: #0075de;
+    --atlasloom-primary-active: #005bab;
+
     font-family: $font-stack;
     color: #0f172a;
     background: #f5f7fb;
@@ -29,4 +32,16 @@ body {
 button,
 a {
     -webkit-tap-highlight-color: transparent;
+}
+
+button.bg-primary {
+    background-color: var(--atlasloom-primary);
+}
+
+button.bg-primary:hover {
+    background-color: var(--atlasloom-primary-active);
+}
+
+button.bg-primary:active {
+    background-color: var(--atlasloom-primary-active);
 }

@@ -11,6 +11,9 @@ coverage/
 !.env.example
 *.local
 
+# 本地项目 JSON 数据
+/data/
+
 # pnpm 调试日志
 pnpm-debug.log*
 

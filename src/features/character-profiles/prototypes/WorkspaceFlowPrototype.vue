@@ -617,7 +617,7 @@
                                 <button
                                     class="min-h-9 rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active"
                                     type="button"
-                                    @click="startCharacterEditing"
+                                    @click="startCharacterEditing()"
                                 >
                                     ＋ 新建角色
                                 </button>
@@ -785,7 +785,7 @@
                         v-if="!showDeletedCharacters"
                         class="mt-5 min-h-11 rounded-lg border border-hairline px-4 font-semibold"
                         type="button"
-                        @click="startCharacterEditing"
+                        @click="startCharacterEditing()"
                     >
                         新建角色
                     </button>

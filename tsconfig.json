@@ -4,6 +4,7 @@
         "useDefineForClassFields": true,
         "module": "ESNext",
         "moduleResolution": "Bundler",
+        "allowImportingTsExtensions": true,
         "paths": {
             "@/*": ["./src/*"]
         },
@@ -17,5 +18,12 @@
         "skipLibCheck": true,
         "noEmit": true
     },
-    "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "uno.config.ts"]
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.vue",
+        "src/features/character-profiles/e2e/**/*.ts",
+        "playwright.config.ts",
+        "vite.config.ts",
+        "uno.config.ts"
+    ]
 }
