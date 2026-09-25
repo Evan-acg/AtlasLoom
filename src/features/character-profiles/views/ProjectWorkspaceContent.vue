@@ -1,43 +1,36 @@
 <script setup lang="ts">
-    import { computed, onMounted, ref, watch } from 'vue'
+    import { computed, ref, watch } from 'vue'
     import { useRoute, useRouter } from 'vue-router'
-    import {
-        createCharacter,
-        deleteCharacter as deleteCharacterRecord,
-        listCharacters,
-        restoreCharacter as restoreCharacterRecord,
-        updateCharacter
-    } from '../api/characters'
-    import {
-        createProject,
-        deleteProject as deleteProjectRecord,
-        listProjects,
-        repairProject as repairProjectStorage,
-        restoreProject as restoreProjectRecord,
-        updateProject
-    } from '../api/projects'
-    import { createTag, listTags, renameTag } from '../api/tags'
     import type { Character, CharacterInput } from '../types/character'
     import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
     import type { Tag } from '../types/tag'
+    import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
-    const projects = ref<Project[]>([])
-    const deletedProjects = ref<Project[]>([])
-    const storageIssues = ref<ProjectStorageIssue[]>([])
-    const loading = ref(true)
+    const props = defineProps<{
+        workspace: ReturnType<typeof useProjectWorkspace>
+        openProject: (project: Project) => void
+        showProjectList: () => void
+    }>()
+    const openProject = props.openProject
+    const showProjectList = props.showProjectList
+    const projects = props.workspace.projects
+    const storageIssues = props.workspace.storageIssues
+    const loading = props.workspace.loading
+    const pageError = props.workspace.projectError
+    const selectedProject = props.workspace.selectedProject
+    const characters = props.workspace.characters
+    const deletedCharacters = props.workspace.deletedCharacters
+    const charactersLoading = props.workspace.charactersLoading
+    const characterPageError = props.workspace.characterError
+    const tags = props.workspace.tags
+    const tagError = props.workspace.tagError
+
     const saving = ref(false)
-    const pageError = ref('')
     const formError = ref('')
-    const selectedProject = ref<Project | null>(null)
-    const characters = ref<Character[]>([])
-    const deletedCharacters = ref<Character[]>([])
-    const charactersLoading = ref(false)
-    const characterPageError = ref('')
+    const tagFormError = ref('')
     const selectedCharacter = ref<Character | null>(null)
-    const tags = ref<Tag[]>([])
     const characterSearch = ref('')
     const selectedTagIds = ref<string[]>([])
-    const tagError = ref('')
     const newTagName = ref('')
     const editingTagId = ref('')
     const editingTagName = ref('')
@@ -56,6 +49,7 @@
     const dialogTitle = computed(() => (dialogMode.value === 'edit' ? '编辑项目' : '新建项目'))
     const selectedProjectIsDeleted = computed(() => Boolean(selectedProject.value?.deletedAt))
     const sortedTags = computed(() => [...tags.value].sort((a, b) => a.name.localeCompare(b.name)))
+    const tagDisplayError = computed(() => tagError.value || tagFormError.value)
     const filteredCharacters = computed(() => {
         const search = characterSearch.value.trim().normalize('NFC').toLocaleLowerCase()
         return characters.value.filter((character) => matchesCharacter(character, search))
@@ -63,33 +57,19 @@
 
     watch(
         () => route.query.project,
-        async () => {
-            syncSelectedProject()
+        () => {
             resetCharacterFilters()
-            await Promise.all([loadCharacters(), loadTags()])
+            syncSelectedCharacter()
         }
     )
-    watch(() => route.query.character, syncSelectedCharacter)
-    onMounted(loadProjects)
+    watch([characters, deletedCharacters, () => route.query.character], syncSelectedCharacter, { immediate: true })
 
     async function loadProjects() {
-        loading.value = true
-        pageError.value = ''
-        try {
-            const result = await listProjects()
-            projects.value = result.projects
-            deletedProjects.value = result.deletedProjects
-            storageIssues.value = result.issues
-            syncSelectedProject()
-            await Promise.all([loadCharacters(), loadTags()])
-        } catch (error) {
-            pageError.value = errorMessage(error)
-        } finally {
-            loading.value = false
-        }
+        await props.workspace.load(typeof route.query.project === 'string' ? route.query.project : null)
     }
 
     function openCreateDialog() {
+        props.workspace.clearProjectError()
         dialogMode.value = 'create'
         projectName.value = ''
         projectDescription.value = ''
@@ -98,6 +78,7 @@
     }
 
     function openEditDialog(project: Project) {
+        props.workspace.clearProjectError()
         dialogMode.value = 'edit'
         projectName.value = project.name
         projectDescription.value = project.description
@@ -107,6 +88,7 @@
 
     function closeDialog() {
         if (saving.value) return
+        props.workspace.clearProjectError()
         dialogMode.value = null
         formError.value = ''
     }
@@ -124,16 +106,8 @@
         saving.value = true
         formError.value = ''
         try {
-            const project =
-                dialogMode.value === 'edit'
-                    ? await updateProject(editingProjectId.value, input)
-                    : await createProject(input)
-            if (dialogMode.value === 'edit') {
-                projects.value = projects.value.map((item) => (item.id === project.id ? project : item))
-                if (selectedProject.value?.id === project.id) selectedProject.value = project
-            } else {
-                projects.value = [...projects.value, project]
-            }
+            if (dialogMode.value === 'edit') await props.workspace.updateProject(editingProjectId.value, input)
+            else await props.workspace.createProject(input)
             dialogMode.value = null
         } catch (error) {
             formError.value = errorMessage(error)
@@ -145,36 +119,26 @@
     async function softDeleteProject(project: Project) {
         const confirmed = globalThis.confirm(`项目“${project.name}”及其角色将从正常浏览中隐藏。是否继续？`)
         if (!confirmed) return
-        pageError.value = ''
         try {
-            const deleted = await deleteProjectRecord(project.id)
-            projects.value = projects.value.filter((item) => item.id !== deleted.id)
-            deletedProjects.value = [...deletedProjects.value.filter((item) => item.id !== deleted.id), deleted]
-            if (selectedProject.value?.id === deleted.id) selectedProject.value = deleted
-        } catch (error) {
-            pageError.value = errorMessage(error)
+            await props.workspace.deleteProject(project.id)
+        } catch {
+            return
         }
     }
 
     async function restoreProject(project: Project) {
-        pageError.value = ''
         try {
-            const restored = await restoreProjectRecord(project.id)
-            deletedProjects.value = deletedProjects.value.filter((item) => item.id !== restored.id)
-            projects.value = [...projects.value.filter((item) => item.id !== restored.id), restored]
-            if (selectedProject.value?.id === restored.id) selectedProject.value = restored
-        } catch (error) {
-            pageError.value = errorMessage(error)
+            await props.workspace.restoreProject(project.id)
+        } catch {
+            return
         }
     }
 
     async function repairStorageIssue(issue: ProjectStorageIssue, resolution: ProjectRepairResolution) {
-        pageError.value = ''
         try {
-            await repairProjectStorage(issue.directoryName, resolution)
-            await loadProjects()
-        } catch (error) {
-            pageError.value = errorMessage(error)
+            await props.workspace.repairProject(issue.directoryName, resolution)
+        } catch {
+            return
         }
     }
 
@@ -184,18 +148,6 @@
         )
         if (!confirmed) return
         await repairStorageIssue(issue, 'restore-backup')
-    }
-
-    function openProject(project: Project) {
-        if (route.query.project === project.id) return
-        const query = { ...route.query, project: project.id, character: undefined }
-        void router.push({ query })
-    }
-
-    function showProjectList() {
-        if (route.query.project === undefined) return
-        const query = { ...route.query, project: undefined, character: undefined }
-        void router.push({ query })
     }
 
     function openCharacter(character: Character) {
@@ -214,7 +166,7 @@
         characterAliases.value = ''
         editingCharacterId.value = ''
         formError.value = ''
-        tagError.value = ''
+        tagFormError.value = ''
         newTagName.value = ''
     }
 
@@ -235,7 +187,7 @@
         characterAliases.value = character.aliases.join('\n')
         editingCharacterId.value = character.id
         formError.value = ''
-        tagError.value = ''
+        tagFormError.value = ''
         newTagName.value = ''
     }
 
@@ -265,13 +217,9 @@
         try {
             const character =
                 characterDialogMode.value === 'edit'
-                    ? await updateCharacter(selectedProject.value.id, editingCharacterId.value, input)
-                    : await createCharacter(selectedProject.value.id, input)
-            if (characterDialogMode.value === 'edit') {
-                characters.value = characters.value.map((item) => (item.id === character.id ? character : item))
-            } else {
-                characters.value = [...characters.value, character]
-            }
+                    ? await props.workspace.updateCharacter(editingCharacterId.value, input)
+                    : await props.workspace.createCharacter(input)
+            if (!character) return
             selectedCharacter.value = character
             characterDialogMode.value = null
             openCharacter(character)
@@ -286,40 +234,23 @@
         if (!selectedProject.value) return
         const confirmed = globalThis.confirm(`角色“${character.name}”将从正常浏览中隐藏。是否继续？`)
         if (!confirmed) return
-        characterPageError.value = ''
         try {
-            const deleted = await deleteCharacterRecord(selectedProject.value.id, character.id)
-            characters.value = characters.value.filter((item) => item.id !== deleted.id)
-            deletedCharacters.value = [...deletedCharacters.value.filter((item) => item.id !== deleted.id), deleted]
+            const deleted = await props.workspace.deleteCharacter(character.id)
+            if (!deleted) return
             if (selectedCharacter.value?.id === deleted.id) selectedCharacter.value = deleted
-        } catch (error) {
-            characterPageError.value = errorMessage(error)
+        } catch {
+            return
         }
     }
 
     async function restoreCharacter(character: Character) {
         if (!selectedProject.value) return
-        characterPageError.value = ''
         try {
-            const restored = await restoreCharacterRecord(selectedProject.value.id, character.id)
-            deletedCharacters.value = deletedCharacters.value.filter((item) => item.id !== restored.id)
-            characters.value = [...characters.value.filter((item) => item.id !== restored.id), restored]
+            const restored = await props.workspace.restoreCharacter(character.id)
+            if (!restored) return
             if (selectedCharacter.value?.id === restored.id) selectedCharacter.value = restored
-        } catch (error) {
-            characterPageError.value = errorMessage(error)
-        }
-    }
-
-    async function loadTags() {
-        if (!selectedProject.value) {
-            tags.value = []
+        } catch {
             return
-        }
-        try {
-            const result = await listTags(selectedProject.value.id)
-            tags.value = result.tags
-        } catch (error) {
-            characterPageError.value = errorMessage(error)
         }
     }
 
@@ -327,83 +258,53 @@
         if (!selectedProject.value) return
         const name = newTagName.value.trim()
         if (!name) {
-            tagError.value = '请填写标签名称。'
+            tagFormError.value = '请填写标签名称。'
             return
         }
 
-        tagError.value = ''
+        tagFormError.value = ''
         try {
-            const tag = await createTag(selectedProject.value.id, { name })
-            tags.value = [...tags.value, tag]
+            const tag = await props.workspace.createTag({ name })
+            if (!tag) return
             characterForm.value.tagIds = [...new Set([...(characterForm.value.tagIds ?? []), tag.id])]
             newTagName.value = ''
-        } catch (error) {
-            tagError.value = errorMessage(error)
+        } catch {
+            return
         }
     }
 
     function startRenameTag(tag: Tag) {
         editingTagId.value = tag.id
         editingTagName.value = tag.name
-        tagError.value = ''
+        tagFormError.value = ''
     }
 
     function cancelRenameTag() {
         editingTagId.value = ''
         editingTagName.value = ''
-        tagError.value = ''
+        tagFormError.value = ''
     }
 
     async function saveTagRename() {
         if (!selectedProject.value) return
         const name = editingTagName.value.trim()
         if (!name) {
-            tagError.value = '请填写标签名称。'
+            tagFormError.value = '请填写标签名称。'
             return
         }
 
-        tagError.value = ''
+        tagFormError.value = ''
         try {
-            const tag = await renameTag(selectedProject.value.id, editingTagId.value, { name })
-            tags.value = tags.value.map((item) => (item.id === tag.id ? tag : item))
+            await props.workspace.renameTag(editingTagId.value, { name })
             cancelRenameTag()
-        } catch (error) {
-            tagError.value = errorMessage(error)
-        }
-    }
-
-    async function loadCharacters() {
-        if (!selectedProject.value) {
-            characters.value = []
-            deletedCharacters.value = []
-            selectedCharacter.value = null
+        } catch {
             return
-        }
-        charactersLoading.value = true
-        characterPageError.value = ''
-        try {
-            const result = await listCharacters(selectedProject.value.id)
-            characters.value = result.characters
-            deletedCharacters.value = result.deletedCharacters
-            syncSelectedCharacter()
-        } catch (error) {
-            characterPageError.value = errorMessage(error)
-        } finally {
-            charactersLoading.value = false
         }
     }
 
     function resetCharacterFilters() {
         characterSearch.value = ''
         selectedTagIds.value = []
-    }
-
-    function syncSelectedProject() {
-        const projectId = route.query.project
-        selectedProject.value =
-            typeof projectId === 'string'
-                ? ([...projects.value, ...deletedProjects.value].find((project) => project.id === projectId) ?? null)
-                : null
     }
 
     function syncSelectedCharacter() {
@@ -747,15 +648,15 @@
                                     还没有项目标签。
                                 </p>
                                 <p
-                                    v-if="tagError"
+                                    v-if="tagDisplayError && !characterDialogMode"
                                     class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
                                     role="alert"
                                 >
-                                    {{ tagError }}
+                                    {{ tagDisplayError }}
                                 </p>
                             </section>
                             <p
-                                v-if="characterPageError"
+                                v-if="characterPageError && !characterDialogMode"
                                 class="mt-5 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
                                 role="alert"
                             >
@@ -845,7 +746,7 @@
                 </header>
 
                 <p
-                    v-if="pageError"
+                    v-if="pageError && !dialogMode"
                     class="mb-4 rounded-lg border border-state-error-border bg-state-error-surface px-4 py-3 text-sm text-state-error"
                     role="alert"
                 >
@@ -938,7 +839,7 @@
                         正在读取本地项目…
                     </p>
                     <p
-                        v-else-if="pageError"
+                        v-else-if="pageError && !dialogMode"
                         class="px-5 py-8 text-center text-sm text-ink-muted"
                     >
                         连接本地项目服务失败，请检查服务后刷新。
@@ -1126,11 +1027,11 @@
                             </button>
                         </div>
                         <p
-                            v-if="tagError"
+                            v-if="tagDisplayError"
                             class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
                             role="alert"
                         >
-                            {{ tagError }}
+                            {{ tagDisplayError }}
                         </p>
                     </fieldset>
                     <div>

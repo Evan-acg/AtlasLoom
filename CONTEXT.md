@@ -1,5 +1,13 @@
 # AtlasLoom Context
 
+## Character Profiles Language
+
+- **项目（Project）**：角色档案的顶层工作容器，拥有其角色和标签数据。
+- **角色（Character）**：归属于一个项目的角色档案。
+- **标签（Tag）**：归属于一个项目、用于分类和筛选角色的标记。
+- **项目工作区（Project workspace）**：围绕一个项目管理其角色和标签的当前工作上下文。
+- **软删除（Soft deletion）**：将项目或角色从正常工作区隐藏，但保留数据以便恢复；项目和角色的删除状态彼此独立。
+
 ## Git Workflow Glossary
 
 - **Issue**: GitHub 上描述需求、缺陷、架构变更或其他可追踪工作的记录，是代码变更的需求事实源。
