@@ -53,6 +53,23 @@ git branch -D <work-branch>
 
 作者可以自审并作为唯一批准者合并。架构、数据模型、破坏性变更和其他高风险变更应增加至少一名其他审查者；这是流程要求，不作为 GitHub 的强制审批数量。
 
+## Issue 标签生命周期
+
+`ready-for-agent` 只表示 Issue 已准备好、尚未开始实施。领取 Issue 后立即移除该标签，避免它继续出现在可领取工作列表中：
+
+```bash
+gh issue edit <issue-number> --remove-label ready-for-agent
+```
+
+实现 PR 合并后，关闭 Issue 前必须再次确认标签已经移除；GitHub 关闭 Issue 不会自动清理标签。关闭操作完成后复核状态和标签：
+
+```bash
+gh issue close <issue-number>
+gh issue view <issue-number> --json state,labels,url
+```
+
+复核的完成条件是 `state` 为 `CLOSED`，且 `labels` 不再包含 `ready-for-agent`。发现已关闭但仍带该标签的历史 Issue 时，使用同一 `gh issue edit ... --remove-label` 命令清理，并在 Issue 留下清理说明。
+
 ## 合并规则
 
 - 普通工作分支通过 PR 合并到 `dev`。
