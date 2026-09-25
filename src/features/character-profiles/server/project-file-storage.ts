@@ -12,6 +12,11 @@ const backupFileName = 'metadata.json.bak'
 const profileDirectoryName = 'profile'
 const tagsDirectoryName = 'tags'
 
+export interface CharacterReadResult {
+    characters: Character[]
+    issues: string[]
+}
+
 export class ProjectStorageError extends Error {
     constructor(
         readonly code: 'missing' | 'exists' | 'invalid-record',
@@ -102,37 +107,43 @@ export class ProjectFileStorage {
     }
 
     async readCharacters(directoryName: string, projectId: string): Promise<Character[]> {
+        return (await this.readCharactersFromDirectory(directoryName, projectId, false)).characters
+    }
+
+    async readCharactersWithIssues(directoryName: string, projectId: string): Promise<CharacterReadResult> {
         return this.readCharactersFromDirectory(directoryName, projectId, false)
     }
 
     async readCharactersStrict(directoryName: string, projectId: string): Promise<Character[]> {
-        return this.readCharactersFromDirectory(directoryName, projectId, true)
+        return (await this.readCharactersFromDirectory(directoryName, projectId, true)).characters
     }
 
     private async readCharactersFromDirectory(
         directoryName: string,
         projectId: string,
         strict: boolean
-    ): Promise<Character[]> {
+    ): Promise<CharacterReadResult> {
         const profilePath = join(this.dataDirectory, directoryName, profileDirectoryName)
         let entries
         try {
             entries = await this.fileSystem.readdir(profilePath, { withFileTypes: true })
         } catch (error) {
-            if (isFileMissingError(error)) return []
+            if (isFileMissingError(error)) return { characters: [], issues: [] }
             throw error
         }
 
         const characters: Character[] = []
+        const issues: string[] = []
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
             } catch {
                 if (strict) throw new ProjectStorageError('invalid-record', `角色文件“${entry.name}”无效。`)
+                issues.push(`角色文件“${entry.name}”无效，已跳过。`)
                 continue
             }
         }
-        return characters.sort((a, b) => a.name.localeCompare(b.name))
+        return { characters: characters.sort((a, b) => a.name.localeCompare(b.name)), issues }
     }
 
     async writeCharacter(directoryName: string, character: Character): Promise<void> {

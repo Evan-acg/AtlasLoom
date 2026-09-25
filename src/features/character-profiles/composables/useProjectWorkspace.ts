@@ -26,6 +26,7 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         selectedProject: projectState.selectedProject,
         characters: characterState.characters,
         deletedCharacters: characterState.deletedCharacters,
+        characterIssues: characterState.issues,
         tags: tagState.tags,
         loading: projectState.loading,
         charactersLoading: characterState.loading,

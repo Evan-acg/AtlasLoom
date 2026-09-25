@@ -12,6 +12,7 @@
         project: Project
         characters: Character[]
         deletedCharacters: Character[]
+        characterIssues: string[]
         selectedCharacterId: string | null
         loading: boolean
         error: string
@@ -123,6 +124,7 @@
         :tags="tags"
         :loading="loading"
         :error="dialogMode ? '' : error"
+        :storage-issues="characterIssues"
         @create="openCreateCharacter"
         @select="(characterId) => emit('selectCharacter', characterId)"
     />

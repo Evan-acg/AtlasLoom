@@ -63,6 +63,7 @@
     const characterJourney: CharacterJourneyState = {
         characters: workspace.characters,
         deletedCharacters: workspace.deletedCharacters,
+        characterIssues: workspace.characterIssues,
         charactersLoading: workspace.charactersLoading,
         error: workspace.characterError,
         tags: workspace.tags,

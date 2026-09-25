@@ -9,6 +9,7 @@
         tags: Tag[]
         loading: boolean
         error: string
+        storageIssues: string[]
     }>()
 
     const emit = defineEmits<{
@@ -94,6 +95,13 @@
             role="alert"
         >
             {{ error }}
+        </p>
+        <p
+            v-if="storageIssues.length"
+            class="mt-5 rounded-md bg-state-warning-surface px-3 py-2 text-sm text-ink-secondary"
+            role="status"
+        >
+            部分角色档案无法读取：{{ storageIssues.join(' ') }}
         </p>
         <p
             v-else-if="loading"

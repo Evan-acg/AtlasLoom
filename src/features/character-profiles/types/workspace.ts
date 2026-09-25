@@ -51,6 +51,7 @@ export interface ProjectJourneyState {
 export interface CharacterJourneyState {
     characters: Ref<Character[]>
     deletedCharacters: Ref<Character[]>
+    characterIssues: Ref<string[]>
     charactersLoading: Ref<boolean>
     error: Ref<string>
     tags: Ref<Tag[]>

@@ -28,4 +28,5 @@ export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 
 export interface CharacterListResult {
     characters: Character[]
     deletedCharacters: Character[]
+    issues?: string[]
 }
