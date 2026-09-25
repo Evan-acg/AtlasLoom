@@ -1,7 +1,9 @@
 import type { Character, CharacterInput, CharacterListResult } from '../types/character.ts'
+import type { BackupArchive, BackupDecisions, BackupMode, BackupPreview, ProjectBackup } from '../types/backup.ts'
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from '../types/project.ts'
 import type { Tag, TagInput, TagListResult } from '../types/tag.ts'
 import { CharacterRepository } from './character-repository.ts'
+import { ProjectBackupRepository } from './project-backup-repository.ts'
 import { ProjectFileStorage } from './project-file-storage.ts'
 import { ProjectDataRepository } from './project-data-repository.ts'
 import { projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
@@ -15,6 +17,7 @@ export class ProjectRepository implements ProjectRepositoryPort {
     private readonly projects: ProjectDataRepository
     private readonly characters: CharacterRepository
     private readonly tags: TagRepository
+    private readonly backups: ProjectBackupRepository
     private operationQueue: Promise<void> = Promise.resolve()
 
     constructor(dataDirectory: string, fileSystem?: ProjectFileSystem, jsonCodec: ProjectJsonCodec = projectJsonCodec) {
@@ -22,6 +25,7 @@ export class ProjectRepository implements ProjectRepositoryPort {
         this.projects = new ProjectDataRepository(storage)
         this.tags = new TagRepository(storage, this.projects)
         this.characters = new CharacterRepository(storage, this.projects, this.tags)
+        this.backups = new ProjectBackupRepository(storage)
     }
 
     listProjects(): Promise<ProjectListResult> {
@@ -78,6 +82,26 @@ export class ProjectRepository implements ProjectRepositoryPort {
 
     renameTag(projectId: string, tagId: string, input: TagInput): Promise<Tag> {
         return this.enqueueOperation(() => this.tags.renameTag(projectId, tagId, input))
+    }
+
+    exportBackup(): Promise<ProjectBackup> {
+        return this.enqueueOperation(() => this.backups.exportBackup())
+    }
+
+    listBackupArchives(): Promise<BackupArchive[]> {
+        return this.enqueueOperation(() => this.backups.listBackupArchives())
+    }
+
+    restoreBackupArchive(id: string): Promise<void> {
+        return this.enqueueOperation(() => this.backups.restoreBackupArchive(id))
+    }
+
+    previewImport(value: unknown, mode: BackupMode): Promise<BackupPreview> {
+        return this.enqueueOperation(() => this.backups.previewImport(value, mode))
+    }
+
+    applyImport(value: unknown, mode: BackupMode, decisions: BackupDecisions): Promise<void> {
+        return this.enqueueOperation(() => this.backups.applyImport(value, mode, decisions))
     }
 
     private enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {

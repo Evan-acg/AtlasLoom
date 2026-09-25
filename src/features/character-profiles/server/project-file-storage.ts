@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { Character } from '../types/character.ts'
+import type { BackupArchive, ProjectBackupBundle } from '../types/backup.ts'
 import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
 import { nodeProjectFileSystem, type ProjectFileSystem } from './project-file-system.ts'
@@ -33,6 +34,7 @@ export class ProjectFileStorage {
     }
 
     async listProjectDirectories(): Promise<string[]> {
+        await this.recoverInterruptedReplacement()
         await this.fileSystem.mkdir(this.dataDirectory, { recursive: true })
         const entries = await this.fileSystem.readdir(this.dataDirectory, { withFileTypes: true })
         return entries
@@ -100,6 +102,18 @@ export class ProjectFileStorage {
     }
 
     async readCharacters(directoryName: string, projectId: string): Promise<Character[]> {
+        return this.readCharactersFromDirectory(directoryName, projectId, false)
+    }
+
+    async readCharactersStrict(directoryName: string, projectId: string): Promise<Character[]> {
+        return this.readCharactersFromDirectory(directoryName, projectId, true)
+    }
+
+    private async readCharactersFromDirectory(
+        directoryName: string,
+        projectId: string,
+        strict: boolean
+    ): Promise<Character[]> {
         const profilePath = join(this.dataDirectory, directoryName, profileDirectoryName)
         let entries
         try {
@@ -114,6 +128,7 @@ export class ProjectFileStorage {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
             } catch (error) {
+                if (strict) throw new ProjectStorageError('invalid-record', `角色文件“${entry.name}”无效。`)
                 if (error instanceof ProjectJsonCodecError) throw error
                 throw new ProjectStorageError('invalid-record', 'Character file is unreadable.')
             }
@@ -128,6 +143,14 @@ export class ProjectFileStorage {
     }
 
     async readTags(directoryName: string, projectId: string): Promise<Tag[]> {
+        return this.readTagsFromDirectory(directoryName, projectId, false)
+    }
+
+    async readTagsStrict(directoryName: string, projectId: string): Promise<Tag[]> {
+        return this.readTagsFromDirectory(directoryName, projectId, true)
+    }
+
+    private async readTagsFromDirectory(directoryName: string, projectId: string, strict: boolean): Promise<Tag[]> {
         const tagsPath = join(this.dataDirectory, directoryName, tagsDirectoryName)
         let entries
         try {
@@ -142,6 +165,7 @@ export class ProjectFileStorage {
             try {
                 tags.push(await this.decodeTag(join(tagsPath, entry.name), projectId))
             } catch {
+                if (strict) throw new ProjectStorageError('invalid-record', `标签文件“${entry.name}”无效。`)
                 continue
             }
         }
@@ -161,6 +185,123 @@ export class ProjectFileStorage {
             )
         }
         await this.writeAtomically(filePath, this.jsonCodec.encodeTag(tag))
+    }
+
+    async replaceDataset(bundles: ProjectBackupBundle[]): Promise<void> {
+        const stagingDirectory = `${this.dataDirectory}.import-${randomUUID()}`
+        const previousDirectory = `${this.dataDirectory}.backup-${Date.now()}-${randomUUID()}`
+        await this.fileSystem.rm(stagingDirectory, { recursive: true, force: true })
+
+        try {
+            await this.writeDataset(stagingDirectory, bundles)
+            await this.fileSystem.rename(this.dataDirectory, previousDirectory)
+            try {
+                await this.fileSystem.rename(stagingDirectory, this.dataDirectory)
+            } catch (error) {
+                await this.fileSystem.rename(previousDirectory, this.dataDirectory)
+                throw error
+            }
+        } finally {
+            await this.fileSystem.rm(stagingDirectory, { recursive: true, force: true })
+        }
+    }
+
+    async listDatasetBackups(): Promise<BackupArchive[]> {
+        const parentDirectory = dirname(this.dataDirectory)
+        const dataDirectoryName = basename(this.dataDirectory)
+        const entries = await this.fileSystem.readdir(parentDirectory, { withFileTypes: true })
+        const backups: BackupArchive[] = []
+        for (const entry of entries.filter(
+            (item) => item.isDirectory() && item.name.startsWith(`${dataDirectoryName}.backup-`)
+        )) {
+            const backupPath = join(parentDirectory, entry.name)
+            const stats = await this.fileSystem.stat(backupPath)
+            backups.push({
+                id: entry.name.slice(`${dataDirectoryName}.backup-`.length),
+                createdAt: stats.mtime.toISOString()
+            })
+        }
+        return backups.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    }
+
+    async restoreDatasetBackup(id: string): Promise<void> {
+        if (!/^[A-Za-z0-9-]+$/u.test(id)) throw new ProjectStorageError('invalid-record', '备份标识无效。')
+        const parentDirectory = dirname(this.dataDirectory)
+        const dataDirectoryName = basename(this.dataDirectory)
+        const backupDirectory = join(parentDirectory, `${dataDirectoryName}.backup-${id}`)
+        const currentDirectory = `${this.dataDirectory}.backup-${Date.now()}-${randomUUID()}`
+        await this.fileSystem.stat(backupDirectory)
+        await this.fileSystem.rename(this.dataDirectory, currentDirectory)
+        try {
+            await this.fileSystem.rename(backupDirectory, this.dataDirectory)
+        } catch (error) {
+            await this.fileSystem.rename(currentDirectory, this.dataDirectory)
+            throw error
+        }
+    }
+
+    private async writeDataset(directory: string, bundles: ProjectBackupBundle[]): Promise<void> {
+        await this.fileSystem.mkdir(directory, { recursive: true })
+        for (const bundle of bundles) {
+            const projectDirectory = join(directory, bundle.project.name)
+            await this.fileSystem.mkdir(projectDirectory, { recursive: true })
+            await this.fileSystem.writeFile(
+                join(projectDirectory, metadataFileName),
+                this.jsonCodec.encodeProject(bundle.project),
+                'utf8'
+            )
+            if (bundle.characters.length) {
+                const profilePath = join(projectDirectory, profileDirectoryName)
+                await this.fileSystem.mkdir(profilePath, { recursive: true })
+                for (const character of bundle.characters) {
+                    await this.fileSystem.writeFile(
+                        join(profilePath, `${character.id}.json`),
+                        this.jsonCodec.encodeCharacter(character),
+                        'utf8'
+                    )
+                }
+            }
+            if (bundle.tags.length) {
+                const tagsPath = join(projectDirectory, tagsDirectoryName)
+                await this.fileSystem.mkdir(tagsPath, { recursive: true })
+                for (const tag of bundle.tags) {
+                    await this.fileSystem.writeFile(
+                        join(tagsPath, `${tag.id}.json`),
+                        this.jsonCodec.encodeTag(tag),
+                        'utf8'
+                    )
+                }
+            }
+        }
+    }
+
+    private async recoverInterruptedReplacement(): Promise<void> {
+        const parentDirectory = dirname(this.dataDirectory)
+        const dataDirectoryName = basename(this.dataDirectory)
+        let entries
+        try {
+            entries = await this.fileSystem.readdir(parentDirectory, { withFileTypes: true })
+        } catch (error) {
+            if (isFileMissingError(error)) return
+            throw error
+        }
+
+        const stagingDirectories = entries
+            .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${dataDirectoryName}.import-`))
+            .map((entry) => entry.name)
+        const previousDirectories = entries
+            .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${dataDirectoryName}.backup-`))
+            .map((entry) => entry.name)
+            .sort()
+            .reverse()
+        const dataDirectoryExists = entries.some((entry) => entry.isDirectory() && entry.name === dataDirectoryName)
+
+        if (!dataDirectoryExists && previousDirectories.length) {
+            await this.fileSystem.rename(join(parentDirectory, previousDirectories[0]!), this.dataDirectory)
+        }
+        for (const stagingDirectory of stagingDirectories) {
+            await this.fileSystem.rm(join(parentDirectory, stagingDirectory), { recursive: true, force: true })
+        }
     }
 
     private async decodeProject(filePath: string): Promise<Project> {
