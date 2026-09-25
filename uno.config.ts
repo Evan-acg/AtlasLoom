@@ -16,6 +16,7 @@ export default defineConfig({
             'ink-muted': '#615d59',
             'ink-faint': '#a39e98',
             hairline: '#e6e6e6',
+            'state-success': '#166534',
             'state-error': '#991b1b',
             'state-error-surface': '#fef2f2',
             'state-error-border': '#fecaca',

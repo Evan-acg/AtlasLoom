@@ -1,12 +1,12 @@
 <script setup lang="ts">
-    import { computed, ref } from 'vue'
+    import { computed, ref, watch } from 'vue'
     import CharacterDetail from './CharacterDetail.vue'
     import CharacterForm from './CharacterForm.vue'
     import CharacterList from './CharacterList.vue'
     import type { Character, CharacterInput, CharacterStorageIssue } from '../types/character'
     import type { Project } from '../types/project'
     import type { Tag, TagInput } from '../types/tag'
-    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
+    import type { CharacterSaveState } from '../types/workspace'
 
     const props = defineProps<{
         project: Project
@@ -20,22 +20,23 @@
         tagError: string
         tagsLoading: boolean
         tagsSaving: boolean
-        createCharacter: (input: CharacterInput) => Promise<Character | undefined>
-        updateCharacter: (characterId: string, input: CharacterInput) => Promise<Character | undefined>
-        deleteCharacter: (characterId: string) => Promise<Character | undefined>
-        restoreCharacter: (characterId: string) => Promise<Character | undefined>
+        saveState: CharacterSaveState
         createTag: (input: TagInput) => Promise<Tag | undefined>
     }>()
 
     const emit = defineEmits<{
         selectCharacter: [characterId: string]
         showList: []
+        saveCharacter: [characterId: string | undefined, input: CharacterInput]
+        resetSaveState: []
+        deleteCharacter: [characterId: string]
+        restoreCharacter: [characterId: string]
     }>()
 
     const dialogMode = ref<'create' | 'edit' | null>(null)
     const editingCharacter = ref<Character | undefined>()
-    const saving = ref(false)
-    const formError = ref('')
+    const saving = computed(() => props.saveState.status === 'saving')
+    const formError = computed(() => (props.saveState.status === 'error' ? props.saveState.message : ''))
     const selectedCharacter = computed(() => {
         if (!props.selectedCharacterId) return null
         return (
@@ -45,64 +46,50 @@
         )
     })
 
-    async function saveCharacter(input: CharacterInput) {
-        saving.value = true
-        formError.value = ''
-        try {
-            const character =
-                dialogMode.value === 'edit' && editingCharacter.value
-                    ? await props.updateCharacter(editingCharacter.value.id, input)
-                    : await props.createCharacter(input)
-            if (!character) return
+    watch(
+        () => props.saveState,
+        (saveState) => {
+            if (saveState.status !== 'success') return
             dialogMode.value = null
             editingCharacter.value = undefined
-            emit('selectCharacter', character.id)
-        } catch (reason) {
-            formError.value = getCharacterProfilesErrorMessage(reason)
-        } finally {
-            saving.value = false
+            emit('selectCharacter', saveState.character.id)
         }
+    )
+
+    function saveCharacter(input: CharacterInput) {
+        emit('saveCharacter', editingCharacter.value?.id, input)
     }
 
     function openCreateCharacter() {
+        emit('resetSaveState')
         editingCharacter.value = undefined
         dialogMode.value = 'create'
-        formError.value = ''
     }
 
     function openEditCharacter() {
         if (!selectedCharacter.value || selectedCharacter.value.deletedAt) return
+        emit('resetSaveState')
         editingCharacter.value = selectedCharacter.value
         dialogMode.value = 'edit'
-        formError.value = ''
     }
 
     function closeForm() {
         if (saving.value) return
         dialogMode.value = null
         editingCharacter.value = undefined
-        formError.value = ''
     }
 
-    async function deleteSelectedCharacter() {
+    function deleteSelectedCharacter() {
         const character = selectedCharacter.value
         if (!character) return
         const confirmed = globalThis.confirm(`角色“${character.name}”将从正常浏览中隐藏。是否继续？`)
         if (!confirmed) return
-        try {
-            await props.deleteCharacter(character.id)
-        } catch {
-            return
-        }
+        emit('deleteCharacter', character.id)
     }
 
-    async function restoreSelectedCharacter() {
+    function restoreSelectedCharacter() {
         if (!selectedCharacter.value) return
-        try {
-            await props.restoreCharacter(selectedCharacter.value.id)
-        } catch {
-            return
-        }
+        emit('restoreCharacter', selectedCharacter.value.id)
     }
 </script>
 

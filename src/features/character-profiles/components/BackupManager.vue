@@ -331,7 +331,7 @@
         role="presentation"
     >
         <section
-            class="mx-auto max-w-3xl rounded-xl border border-hairline bg-surface p-5 shadow-xl sm:p-7"
+            class="mx-auto max-w-3xl rounded-xl border border-hairline bg-surface p-5 shadow-lg sm:p-7"
             role="dialog"
             aria-modal="true"
             aria-labelledby="backup-dialog-title"
