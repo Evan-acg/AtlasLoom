@@ -96,13 +96,14 @@
         >
             {{ error }}
         </p>
-        <p
-            v-if="storageIssues.length"
-            class="mt-5 rounded-md bg-state-warning-surface px-3 py-2 text-sm text-ink-secondary"
-            role="status"
-        >
-            部分角色档案无法读取：{{ storageIssues.join(' ') }}
-        </p>
+        <template v-if="storageIssues.length">
+            <p
+                class="mt-5 rounded-md bg-state-warning-surface px-3 py-2 text-sm text-ink-secondary"
+                role="status"
+            >
+                部分角色档案无法读取：{{ storageIssues.join(' ') }}
+            </p>
+        </template>
         <p
             v-else-if="loading"
             class="mt-7 text-center text-sm text-ink-muted"

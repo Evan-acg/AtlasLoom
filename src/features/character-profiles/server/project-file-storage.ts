@@ -5,7 +5,7 @@ import type { BackupArchive, ProjectBackupBundle } from '../types/backup.ts'
 import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
 import { nodeProjectFileSystem, type ProjectFileSystem } from './project-file-system.ts'
-import { projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
+import { ProjectJsonCodecError, projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
 
 const metadataFileName = 'metadata.json'
 const backupFileName = 'metadata.json.bak'
@@ -137,9 +137,9 @@ export class ProjectFileStorage {
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
-            } catch {
+            } catch (error) {
                 if (strict) throw new ProjectStorageError('invalid-record', `角色文件“${entry.name}”无效。`)
-                issues.push(`角色文件“${entry.name}”无效，已跳过。`)
+                issues.push(characterFileIssue(entry.name, error))
                 continue
             }
         }
@@ -387,4 +387,16 @@ function isFileExistsError(error: unknown): boolean {
 
 function isFileMissingError(error: unknown): boolean {
     return isRecord(error) && error.code === 'ENOENT'
+}
+
+function characterFileIssue(fileName: string, error: unknown): string {
+    const reason =
+        error instanceof ProjectJsonCodecError
+            ? error.code === 'invalid-json'
+                ? '无法解析为有效 JSON'
+                : error.code === 'unsupported-version'
+                  ? '使用了不受支持的格式版本'
+                  : '缺少必需字段或字段格式错误'
+            : '无法读取'
+    return `角色文件“${fileName}”${reason}，已跳过。`
 }
