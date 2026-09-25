@@ -79,6 +79,7 @@
     <ProjectWorkspaceContent
         v-else
         :workspace="workspace"
+        :tag-state="workspace.tagState"
         :open-project="openProject"
         :show-project-list="showProjectList"
     />

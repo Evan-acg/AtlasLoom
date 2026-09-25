@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import type { Character, CharacterInput } from '../types/character'
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from '../types/project'
-import type { Tag, TagInput } from '../types/tag'
 import type { ProjectWorkspaceAdapters } from '../types/workspace'
+import { useProjectTags } from './useProjectTags'
 
 export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     const projects = ref<Project[]>([])
@@ -10,13 +10,12 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     const storageIssues = ref<ProjectListResult['issues']>([])
     const characters = ref<Character[]>([])
     const deletedCharacters = ref<Character[]>([])
-    const tags = ref<Tag[]>([])
+    const tagState = useProjectTags(adapters.tags)
     const selectedProjectId = ref<string | null>(null)
     const loading = ref(false)
     const charactersLoading = ref(false)
     const projectError = ref('')
     const characterError = ref('')
-    const tagError = ref('')
     let loadToken = 0
 
     const selectedProject = computed(
@@ -28,14 +27,13 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     async function load(projectId: string | null = null) {
         const token = ++loadToken
         selectedProjectId.value = projectId
+        tagState.selectProject(projectId)
         characters.value = []
         deletedCharacters.value = []
-        tags.value = []
         loading.value = true
         charactersLoading.value = false
         projectError.value = ''
         characterError.value = ''
-        tagError.value = ''
         try {
             await refreshProjects(token)
         } catch {
@@ -49,7 +47,7 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         }
 
         if (token !== loadToken) return
-        await Promise.allSettled([refreshCharacters(projectId, token), refreshTags(projectId, token)])
+        await Promise.allSettled([refreshCharacters(projectId, token), tagState.load(projectId)])
     }
 
     async function refreshProjects(token = loadToken) {
@@ -188,50 +186,6 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         }
     }
 
-    async function refreshTags(projectId = selectedProjectId.value, token = loadToken) {
-        if (!projectId) {
-            tags.value = []
-            return
-        }
-        tagError.value = ''
-        try {
-            const result = await adapters.tags.list(projectId)
-            if (token !== loadToken || selectedProjectId.value !== projectId) return
-            tags.value = result.tags
-        } catch (reason) {
-            if (token === loadToken && selectedProjectId.value === projectId) tagError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function createTag(input: TagInput) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const tag = await adapters.tags.create(projectId, input)
-            if (selectedProjectId.value !== projectId) return
-            await refreshTags(projectId)
-            return tag
-        } catch (reason) {
-            tagError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function renameTag(tagId: string, input: TagInput) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const tag = await adapters.tags.rename(projectId, tagId, input)
-            if (selectedProjectId.value !== projectId) return
-            await refreshTags(projectId)
-            return tag
-        } catch (reason) {
-            tagError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
     async function restoreCharacter(characterId: string) {
         const projectId = selectedProjectId.value
         if (!projectId) return
@@ -253,12 +207,13 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         selectedProject,
         characters,
         deletedCharacters,
-        tags,
+        tags: tagState.tags,
         loading,
         charactersLoading,
         projectError,
         characterError,
-        tagError,
+        tagError: tagState.tagError,
+        tagState,
         load,
         createProject,
         updateProject,
@@ -269,8 +224,8 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         createCharacter,
         updateCharacter,
         deleteCharacter,
-        createTag,
-        renameTag,
+        createTag: tagState.createTag,
+        renameTag: tagState.renameTag,
         restoreCharacter
     }
 }

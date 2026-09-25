@@ -3,11 +3,15 @@
     import { useRoute, useRouter } from 'vue-router'
     import type { Character, CharacterInput } from '../types/character'
     import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
-    import type { Tag } from '../types/tag'
+    import type { ProjectTagViewState } from '../composables/useProjectTags'
+    import CharacterTagField from '../components/CharacterTagField.vue'
+    import ProjectTagManager from '../components/ProjectTagManager.vue'
+    import TagFilterControls from '../components/TagFilterControls.vue'
     import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
     const props = defineProps<{
         workspace: ReturnType<typeof useProjectWorkspace>
+        tagState: ProjectTagViewState
         openProject: (project: Project) => void
         showProjectList: () => void
     }>()
@@ -22,18 +26,15 @@
     const deletedCharacters = props.workspace.deletedCharacters
     const charactersLoading = props.workspace.charactersLoading
     const characterPageError = props.workspace.characterError
-    const tags = props.workspace.tags
-    const tagError = props.workspace.tagError
+    const tagState = props.tagState
+    const tags = tagState.tags
+    const tagError = tagState.tagError
 
     const saving = ref(false)
     const formError = ref('')
-    const tagFormError = ref('')
     const selectedCharacter = ref<Character | null>(null)
     const characterSearch = ref('')
     const selectedTagIds = ref<string[]>([])
-    const newTagName = ref('')
-    const editingTagId = ref('')
-    const editingTagName = ref('')
     const dialogMode = ref<'create' | 'edit' | null>(null)
     const characterDialogMode = ref<'create' | 'edit' | null>(null)
     const projectName = ref('')
@@ -48,8 +49,7 @@
     const sortedProjects = computed(() => [...projects.value].sort((a, b) => a.name.localeCompare(b.name)))
     const dialogTitle = computed(() => (dialogMode.value === 'edit' ? '编辑项目' : '新建项目'))
     const selectedProjectIsDeleted = computed(() => Boolean(selectedProject.value?.deletedAt))
-    const sortedTags = computed(() => [...tags.value].sort((a, b) => a.name.localeCompare(b.name)))
-    const tagDisplayError = computed(() => tagError.value || tagFormError.value)
+    const hasActiveFilters = computed(() => Boolean(characterSearch.value.trim() || selectedTagIds.value.length))
     const filteredCharacters = computed(() => {
         const search = characterSearch.value.trim().normalize('NFC').toLocaleLowerCase()
         return characters.value.filter((character) => matchesCharacter(character, search))
@@ -166,8 +166,6 @@
         characterAliases.value = ''
         editingCharacterId.value = ''
         formError.value = ''
-        tagFormError.value = ''
-        newTagName.value = ''
     }
 
     function openEditCharacter(character: Character) {
@@ -187,8 +185,6 @@
         characterAliases.value = character.aliases.join('\n')
         editingCharacterId.value = character.id
         formError.value = ''
-        tagFormError.value = ''
-        newTagName.value = ''
     }
 
     function closeCharacterDialog() {
@@ -254,57 +250,13 @@
         }
     }
 
-    async function createTagFromCharacter() {
-        if (!selectedProject.value) return
-        const name = newTagName.value.trim()
-        if (!name) {
-            tagFormError.value = '请填写标签名称。'
-            return
-        }
-
-        tagFormError.value = ''
-        try {
-            const tag = await props.workspace.createTag({ name })
-            if (!tag) return
-            characterForm.value.tagIds = [...new Set([...(characterForm.value.tagIds ?? []), tag.id])]
-            newTagName.value = ''
-        } catch {
-            return
-        }
-    }
-
-    function startRenameTag(tag: Tag) {
-        editingTagId.value = tag.id
-        editingTagName.value = tag.name
-        tagFormError.value = ''
-    }
-
-    function cancelRenameTag() {
-        editingTagId.value = ''
-        editingTagName.value = ''
-        tagFormError.value = ''
-    }
-
-    async function saveTagRename() {
-        if (!selectedProject.value) return
-        const name = editingTagName.value.trim()
-        if (!name) {
-            tagFormError.value = '请填写标签名称。'
-            return
-        }
-
-        tagFormError.value = ''
-        try {
-            await props.workspace.renameTag(editingTagId.value, { name })
-            cancelRenameTag()
-        } catch {
-            return
-        }
-    }
-
     function resetCharacterFilters() {
         characterSearch.value = ''
         selectedTagIds.value = []
+    }
+
+    function updateCharacterTagIds(tagIds: string[]) {
+        characterForm.value.tagIds = tagIds
     }
 
     function syncSelectedCharacter() {
@@ -570,91 +522,24 @@
                                         placeholder="姓名、别名或简介"
                                     />
                                 </div>
-                                <fieldset v-if="sortedTags.length">
-                                    <legend class="mb-2 text-sm font-medium">按标签筛选</legend>
-                                    <div class="flex flex-wrap gap-x-4 gap-y-2">
-                                        <label
-                                            v-for="tag in sortedTags"
-                                            :key="tag.id"
-                                            class="inline-flex min-h-8 items-center gap-2 text-sm text-ink-secondary"
-                                        >
-                                            <input
-                                                v-model="selectedTagIds"
-                                                type="checkbox"
-                                                :aria-label="`筛选标签：${tag.name}`"
-                                                :value="tag.id"
-                                            />
-                                            {{ tag.name }}
-                                        </label>
-                                    </div>
-                                </fieldset>
+                                <TagFilterControls
+                                    v-model="selectedTagIds"
+                                    :tags="tags"
+                                />
+                                <button
+                                    v-if="hasActiveFilters"
+                                    class="min-h-10 self-end rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft sm:col-span-2 sm:justify-self-end"
+                                    type="button"
+                                    @click="resetCharacterFilters"
+                                >
+                                    清除筛选
+                                </button>
                             </div>
-                            <section
-                                class="mt-6 rounded-lg border border-hairline p-4"
-                                aria-labelledby="project-tags-title"
-                            >
-                                <h3
-                                    id="project-tags-title"
-                                    class="text-sm font-semibold"
-                                >
-                                    项目标签
-                                </h3>
-                                <div
-                                    v-if="sortedTags.length"
-                                    class="mt-3 space-y-2"
-                                >
-                                    <div
-                                        v-for="tag in sortedTags"
-                                        :key="tag.id"
-                                        class="flex flex-wrap items-center gap-2 text-sm"
-                                    >
-                                        <span class="rounded-full bg-canvas-soft px-2.5 py-1">{{ tag.name }}</span>
-                                        <button
-                                            class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
-                                            type="button"
-                                            :aria-label="`重命名标签：${tag.name}`"
-                                            @click="startRenameTag(tag)"
-                                        >
-                                            重命名
-                                        </button>
-                                        <template v-if="editingTagId === tag.id">
-                                            <input
-                                                v-model="editingTagName"
-                                                class="min-h-9 rounded border border-hairline bg-white px-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                                aria-label="标签名称"
-                                                maxlength="80"
-                                            />
-                                            <button
-                                                class="min-h-9 rounded-full bg-primary px-3 text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                                type="button"
-                                                @click="saveTagRename"
-                                            >
-                                                保存标签
-                                            </button>
-                                            <button
-                                                class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
-                                                type="button"
-                                                @click="cancelRenameTag"
-                                            >
-                                                取消
-                                            </button>
-                                        </template>
-                                    </div>
-                                </div>
-                                <p
-                                    v-else
-                                    class="mt-2 text-sm text-ink-muted"
-                                >
-                                    还没有项目标签。
-                                </p>
-                                <p
-                                    v-if="tagDisplayError && !characterDialogMode"
-                                    class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-                                    role="alert"
-                                >
-                                    {{ tagDisplayError }}
-                                </p>
-                            </section>
+                            <ProjectTagManager
+                                :tags="tags"
+                                :error="characterDialogMode ? '' : tagError"
+                                :rename-tag="tagState.renameTag"
+                            />
                             <p
                                 v-if="characterPageError && !characterDialogMode"
                                 class="mt-5 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
@@ -990,50 +875,13 @@
                             rows="2"
                         />
                     </div>
-                    <fieldset class="rounded-lg border border-hairline p-4">
-                        <legend class="px-1 text-sm font-medium">角色标签</legend>
-                        <div
-                            v-if="sortedTags.length"
-                            class="mt-1 flex flex-wrap gap-x-4 gap-y-2"
-                        >
-                            <label
-                                v-for="tag in sortedTags"
-                                :key="tag.id"
-                                class="inline-flex min-h-9 items-center gap-2 text-sm text-ink-secondary"
-                            >
-                                <input
-                                    v-model="characterForm.tagIds"
-                                    type="checkbox"
-                                    :aria-label="`角色标签：${tag.name}`"
-                                    :value="tag.id"
-                                />
-                                {{ tag.name }}
-                            </label>
-                        </div>
-                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-                            <input
-                                v-model="newTagName"
-                                class="min-h-10 min-w-0 flex-1 rounded border border-hairline bg-white px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                aria-label="新建标签"
-                                maxlength="80"
-                                placeholder="输入标签名称"
-                            />
-                            <button
-                                class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
-                                type="button"
-                                @click="createTagFromCharacter"
-                            >
-                                新建标签
-                            </button>
-                        </div>
-                        <p
-                            v-if="tagDisplayError"
-                            class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-                            role="alert"
-                        >
-                            {{ tagDisplayError }}
-                        </p>
-                    </fieldset>
+                    <CharacterTagField
+                        :model-value="characterForm.tagIds ?? []"
+                        :tags="tags"
+                        :error="tagError"
+                        :create-tag="tagState.createTag"
+                        @update:model-value="updateCharacterTagIds"
+                    />
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium"
