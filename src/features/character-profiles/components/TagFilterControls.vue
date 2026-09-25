@@ -15,7 +15,10 @@
 </script>
 
 <template>
-    <fieldset v-if="sortedTags.length">
+    <fieldset
+        v-if="sortedTags.length"
+        class="focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary"
+    >
         <legend class="mb-2 text-sm font-medium">按标签筛选</legend>
         <div class="flex flex-wrap gap-x-4 gap-y-2">
             <label
@@ -25,6 +28,7 @@
             >
                 <input
                     v-model="selectedTagIds"
+                    class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     type="checkbox"
                     :aria-label="`筛选标签：${tag.name}`"
                     :value="tag.id"

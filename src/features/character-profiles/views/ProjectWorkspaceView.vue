@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { computed, onMounted, onUnmounted, watch } from 'vue'
+    import { computed, onMounted, watch } from 'vue'
     import { useRoute, useRouter } from 'vue-router'
     import {
         createCharacter,
@@ -51,7 +51,6 @@
         selectedProject: workspace.selectedProject,
         loading: workspace.loading,
         error: workspace.projectError,
-        load: workspace.load,
         refresh: workspace.refreshProjects,
         create: workspace.createProject,
         update: workspace.updateProject,
@@ -75,6 +74,9 @@
         renameTag: workspace.renameTag
     }
     const selectedProjectId = computed(() => (typeof route.query.project === 'string' ? route.query.project : null))
+    const selectedCharacterId = computed(() =>
+        typeof route.query.character === 'string' ? route.query.character : null
+    )
     const isArchivedProject = computed(() => {
         return Boolean(
             selectedProjectId.value &&
@@ -82,16 +84,8 @@
         )
     })
 
-    onMounted(() => {
-        globalThis.addEventListener('atlasloom:data-changed', refreshProjectState)
-        void workspace.load(selectedProjectId.value)
-    })
-    onUnmounted(() => globalThis.removeEventListener('atlasloom:data-changed', refreshProjectState))
+    onMounted(() => void workspace.load(selectedProjectId.value))
     watch(selectedProjectId, (projectId) => void workspace.load(projectId))
-
-    function refreshProjectState() {
-        void workspace.load(selectedProjectId.value)
-    }
 
     function openProject(project: Project) {
         if (route.query.project === project.id) return
@@ -102,16 +96,51 @@
         if (route.query.project === undefined) return
         void router.push({ query: { ...route.query, project: undefined, character: undefined } })
     }
+
+    function openCharacter(characterId: string) {
+        if (route.query.character === characterId) return
+        void router.push({ query: { ...route.query, character: characterId } })
+    }
+
+    function showCharacterList() {
+        if (route.query.character === undefined) return
+        void router.push({ query: { ...route.query, character: undefined } })
+    }
+
+    function restoreProjectRecord(projectId: string) {
+        return workspace.restoreProject(projectId)
+    }
 </script>
 
 <template>
-    <SoftDeleteControls />
-    <ArchivedProjectView v-if="isArchivedProject" />
+    <SoftDeleteControls
+        :deleted-projects="workspace.deletedProjects.value"
+        :selected-project="workspace.selectedProject.value"
+        :deleted-characters="workspace.deletedCharacters.value"
+        :selected-character-id="selectedCharacterId"
+        :restore-project="restoreProjectRecord"
+        :restore-character="workspace.restoreCharacter"
+        :open-project="openProject"
+    />
+    <ArchivedProjectView
+        v-if="isArchivedProject"
+        :project="workspace.selectedProject.value"
+        :characters="workspace.characters.value"
+        :deleted-characters="workspace.deletedCharacters.value"
+        :loading="workspace.loading.value || workspace.charactersLoading.value"
+        :error="workspace.projectError.value || workspace.characterError.value"
+        :restore-project="restoreProjectRecord"
+        :restore-character="workspace.restoreCharacter"
+        :show-project-list="showProjectList"
+    />
     <ProjectWorkspaceContent
         v-else
         :project-state="projectJourney"
         :character-state="characterJourney"
+        :selected-character-id="selectedCharacterId"
         :open-project="openProject"
         :show-project-list="showProjectList"
+        :open-character="openCharacter"
+        :show-character-list="showCharacterList"
     />
 </template>

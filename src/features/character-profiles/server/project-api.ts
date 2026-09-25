@@ -5,6 +5,7 @@ import type { TagInput } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 import { ProjectRepository, ProjectRepositoryError } from './project-repository.ts'
 import type { ProjectRepositoryFactory, ProjectRepositoryPort } from './project-repository-port.ts'
+import { getCharacterProfilesErrorMessage } from '../utils/error-message.ts'
 
 const maximumRequestBytes = 64 * 1024
 
@@ -27,7 +28,10 @@ export function createProjectApiMiddleware(
         void handleRequest(request, response, repository).catch((error: unknown) => {
             if (response.writableEnded) return
             const status = getErrorStatus(error)
-            const message = status === 500 ? '本地项目服务暂时无法处理请求。' : errorMessage(error)
+            const message =
+                status === 500
+                    ? '本地项目服务暂时无法处理请求。'
+                    : getCharacterProfilesErrorMessage(error, '请求无法完成。')
             sendJson(response, status, { error: message })
         })
     }
@@ -299,15 +303,13 @@ function getErrorStatus(error: unknown): number {
                 return 409
             case 'not-found':
                 return 404
+            case 'invalid-tag-reference':
+                return 400
             case 'invalid-data':
                 return 422
         }
     }
     return 500
-}
-
-function errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : '请求无法完成。'
 }
 
 function isProjectRepairResolution(value: unknown): value is ProjectRepairResolution {

@@ -6,6 +6,7 @@
     import type { Character, CharacterInput } from '../types/character'
     import type { Project } from '../types/project'
     import type { Tag, TagInput } from '../types/tag'
+    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
     const props = defineProps<{
         project: Project
@@ -54,7 +55,7 @@
             editingCharacter.value = undefined
             emit('selectCharacter', character.id)
         } catch (reason) {
-            formError.value = errorMessage(reason)
+            formError.value = getCharacterProfilesErrorMessage(reason)
         } finally {
             saving.value = false
         }
@@ -99,10 +100,6 @@
         } catch {
             return
         }
-    }
-
-    function errorMessage(reason: unknown): string {
-        return reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
     }
 </script>
 

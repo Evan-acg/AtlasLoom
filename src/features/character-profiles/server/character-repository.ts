@@ -4,11 +4,13 @@ import { ProjectFileStorage, ProjectStorageError } from './project-file-storage.
 import { ProjectJsonCodecError } from './project-json-codec.ts'
 import { ProjectRepositoryError } from './project-repository-error.ts'
 import type { ProjectLookup } from './repository-context.ts'
+import type { TagRepository } from './tag-repository.ts'
 
 export class CharacterRepository {
     constructor(
         private readonly storage: ProjectFileStorage,
-        private readonly projects: ProjectLookup
+        private readonly projects: ProjectLookup,
+        private readonly tags: TagRepository
     ) {}
 
     async listCharacters(projectId: string): Promise<CharacterListResult> {
@@ -23,6 +25,7 @@ export class CharacterRepository {
     async createCharacter(projectId: string, input: CharacterInput): Promise<Character> {
         const located = await this.projects.findProject(projectId)
         const normalized = normalizeCharacterInput(input)
+        await this.tags.assertTagsBelongToProject(located.directoryName, located.project.id, normalized.tagIds ?? [])
         await this.assertNameAvailable(located.directoryName, located.project.id, normalized.name)
         const now = new Date().toISOString()
         const character: Character = {
@@ -43,6 +46,7 @@ export class CharacterRepository {
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         const normalized = normalizeCharacterInput(input)
+        await this.tags.assertTagsBelongToProject(located.directoryName, located.project.id, normalized.tagIds ?? [])
         await this.assertNameAvailable(located.directoryName, located.project.id, normalized.name, characterId)
         if (JSON.stringify({ ...current, ...normalized }) === JSON.stringify(current)) return current
         const updated: Character = { ...current, ...normalized, updatedAt: new Date().toISOString() }

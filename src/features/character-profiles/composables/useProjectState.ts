@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
 import type { ProjectWorkspaceProjectAdapter } from '../types/workspace'
+import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
 export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
     const projects = ref<Project[]>([])
@@ -33,7 +34,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             deletedProjects.value = result.deletedProjects
             storageIssues.value = result.issues
         } catch (reason) {
-            if (token === requestToken) error.value = errorMessage(reason)
+            if (token === requestToken) error.value = getCharacterProfilesErrorMessage(reason)
         } finally {
             if (token === requestToken) loading.value = false
         }
@@ -45,7 +46,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             await refresh()
             return project
         } catch (reason) {
-            error.value = errorMessage(reason)
+            error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -56,7 +57,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             await refresh()
             return project
         } catch (reason) {
-            error.value = errorMessage(reason)
+            error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -67,7 +68,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             await refresh()
             return project
         } catch (reason) {
-            error.value = errorMessage(reason)
+            error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -78,7 +79,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             await refresh()
             return project
         } catch (reason) {
-            error.value = errorMessage(reason)
+            error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -88,7 +89,7 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
             await adapter.repair(directoryName, resolution)
             await refresh()
         } catch (reason) {
-            error.value = errorMessage(reason)
+            error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -114,8 +115,4 @@ export function useProjectState(adapter: ProjectWorkspaceProjectAdapter) {
         repair,
         clearError
     }
-}
-
-function errorMessage(reason: unknown): string {
-    return reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
 }

@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { Tag, TagInput } from '../types/tag'
 import type { ProjectWorkspaceTagAdapter } from '../types/workspace'
+import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
 export interface ProjectTagState {
     tags: Ref<Tag[]>
@@ -10,8 +11,6 @@ export interface ProjectTagState {
     createTag: (input: TagInput) => Promise<Tag | undefined>
     renameTag: (tagId: string, input: TagInput) => Promise<Tag | undefined>
 }
-
-export type ProjectTagViewState = Pick<ProjectTagState, 'tags' | 'tagError' | 'createTag' | 'renameTag'>
 
 export function useProjectTags(adapter: ProjectWorkspaceTagAdapter): ProjectTagState {
     const tags = ref<Tag[]>([])
@@ -38,7 +37,9 @@ export function useProjectTags(adapter: ProjectWorkspaceTagAdapter): ProjectTagS
             if (token !== requestToken || activeProjectId !== projectId) return
             tags.value = result.tags
         } catch (reason) {
-            if (token === requestToken && activeProjectId === projectId) tagError.value = errorMessage(reason)
+            if (token === requestToken && activeProjectId === projectId) {
+                tagError.value = getCharacterProfilesErrorMessage(reason)
+            }
             throw reason
         }
     }
@@ -54,7 +55,9 @@ export function useProjectTags(adapter: ProjectWorkspaceTagAdapter): ProjectTagS
             await load(projectId)
             return tag
         } catch (reason) {
-            if (token === requestToken && activeProjectId === projectId) tagError.value = errorMessage(reason)
+            if (token === requestToken && activeProjectId === projectId) {
+                tagError.value = getCharacterProfilesErrorMessage(reason)
+            }
             throw reason
         }
     }
@@ -70,14 +73,12 @@ export function useProjectTags(adapter: ProjectWorkspaceTagAdapter): ProjectTagS
             await load(projectId)
             return tag
         } catch (reason) {
-            if (token === requestToken && activeProjectId === projectId) tagError.value = errorMessage(reason)
+            if (token === requestToken && activeProjectId === projectId) {
+                tagError.value = getCharacterProfilesErrorMessage(reason)
+            }
             throw reason
         }
     }
 
     return { tags, tagError, selectProject, load, createTag, renameTag }
-}
-
-function errorMessage(reason: unknown): string {
-    return reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
 }

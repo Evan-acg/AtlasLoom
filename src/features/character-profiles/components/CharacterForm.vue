@@ -20,8 +20,13 @@
     }>()
 
     const draft = ref<CharacterInput>(toCharacterInput(props.character))
-    const aliases = ref(props.character?.aliases.join('\n') ?? '')
     const validationError = ref('')
+    const aliasesText = computed({
+        get: () => draft.value.aliases.join('\n'),
+        set: (value: string) => {
+            draft.value.aliases = value.split('\n')
+        }
+    })
     const displayError = computed(() => props.error || validationError.value)
 
     function submit() {
@@ -35,10 +40,7 @@
         emit('submit', {
             ...draft.value,
             name,
-            aliases: aliases.value
-                .split('\n')
-                .map((alias) => alias.trim())
-                .filter(Boolean)
+            aliases: draft.value.aliases.map((alias) => alias.trim()).filter(Boolean)
         })
     }
 
@@ -113,7 +115,7 @@
                     </label>
                     <textarea
                         id="character-aliases"
-                        v-model="aliases"
+                        v-model="aliasesText"
                         class="min-h-20 w-full resize-y rounded border border-hairline bg-white px-3 py-2 text-base leading-6 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                         name="character-aliases"
                         placeholder="每行填写一个别名"

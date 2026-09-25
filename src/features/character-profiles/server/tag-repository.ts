@@ -39,6 +39,17 @@ export class TagRepository {
         return updated
     }
 
+    async assertTagsBelongToProject(directoryName: string, projectId: string, tagIds: string[]): Promise<void> {
+        if (!tagIds.length) return
+        const tags = await this.readTags(directoryName, projectId)
+        const hasForeignOrMissingTag = tagIds.some(
+            (tagId) => !tags.some((tag) => tag.id === tagId && tag.projectId === projectId)
+        )
+        if (hasForeignOrMissingTag) {
+            throw new ProjectRepositoryError('角色标签必须属于当前项目。', 'invalid-tag-reference')
+        }
+    }
+
     private async readTags(directoryName: string, projectId: string): Promise<Tag[]> {
         try {
             return await this.storage.readTags(directoryName, projectId)

@@ -80,7 +80,7 @@
             />
             <button
                 v-if="hasActiveFilters"
-                class="min-h-10 self-end rounded-md border border-hairline px-3 text-sm font-medium hover:bg-white sm:col-span-2 sm:justify-self-end"
+                class="min-h-10 self-end rounded-md border border-hairline px-3 text-sm font-medium hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:col-span-2 sm:justify-self-end"
                 type="button"
                 @click="resetFilters"
             >

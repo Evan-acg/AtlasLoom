@@ -1,6 +1,5 @@
 <script setup lang="ts">
-    import { computed, ref } from 'vue'
-    import { useRoute, useRouter } from 'vue-router'
+    import { ref } from 'vue'
     import CharacterJourney from '../components/CharacterJourney.vue'
     import ProjectDetail from '../components/ProjectDetail.vue'
     import ProjectForm from '../components/ProjectForm.vue'
@@ -8,16 +7,17 @@
     import ProjectTagManager from '../components/ProjectTagManager.vue'
     import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
     import type { CharacterJourneyState, ProjectJourneyState } from '../types/workspace'
+    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
     const props = defineProps<{
         projectState: ProjectJourneyState
         characterState: CharacterJourneyState
+        selectedCharacterId: string | null
         openProject: (project: Project) => void
         showProjectList: () => void
+        openCharacter: (characterId: string) => void
+        showCharacterList: () => void
     }>()
-    const route = useRoute()
-    const router = useRouter()
-
     const projects = props.projectState.projects
     const storageIssues = props.projectState.storageIssues
     const loading = props.projectState.loading
@@ -34,10 +34,6 @@
     const projectSaving = ref(false)
     const editingProject = ref<Project | null>(null)
     const projectFormError = ref('')
-    const selectedCharacterId = computed(() =>
-        typeof route.query.character === 'string' ? route.query.character : null
-    )
-
     async function loadProjects() {
         await props.projectState.refresh()
     }
@@ -77,7 +73,7 @@
             editingProject.value = null
             props.projectState.clearError()
         } catch (reason) {
-            projectFormError.value = errorMessage(reason)
+            projectFormError.value = getCharacterProfilesErrorMessage(reason)
         } finally {
             projectSaving.value = false
         }
@@ -124,19 +120,6 @@
         if (!confirmed) return
         await repairStorageIssue(issue, 'restore-backup')
     }
-
-    function openCharacter(characterId: string) {
-        if (route.query.character === characterId) return
-        void router.push({ query: { ...route.query, character: characterId } })
-    }
-
-    function showCharacterList() {
-        void router.push({ query: { ...route.query, character: undefined } })
-    }
-
-    function errorMessage(reason: unknown): string {
-        return reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-    }
 </script>
 
 <template>
@@ -155,7 +138,7 @@
                         :project="selectedProject"
                         :characters="characters"
                         :deleted-characters="deletedCharacters"
-                        :selected-character-id="selectedCharacterId"
+                        :selected-character-id="props.selectedCharacterId"
                         :loading="charactersLoading"
                         :error="characterPageError"
                         :tags="tags"
@@ -165,11 +148,11 @@
                         :restore-character="props.characterState.restore"
                         :create-tag="props.characterState.createTag"
                         :tag-error="tagError"
-                        @select-character="openCharacter"
-                        @show-list="showCharacterList"
+                        @select-character="props.openCharacter"
+                        @show-list="props.showCharacterList"
                     />
                     <ProjectTagManager
-                        v-if="!selectedCharacterId"
+                        v-if="!props.selectedCharacterId"
                         :tags="tags"
                         :error="tagError"
                         :rename-tag="props.characterState.renameTag"

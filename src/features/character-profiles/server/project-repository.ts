@@ -20,8 +20,8 @@ export class ProjectRepository implements ProjectRepositoryPort {
     constructor(dataDirectory: string, fileSystem?: ProjectFileSystem, jsonCodec: ProjectJsonCodec = projectJsonCodec) {
         const storage = new ProjectFileStorage(dataDirectory, fileSystem, jsonCodec)
         this.projects = new ProjectDataRepository(storage)
-        this.characters = new CharacterRepository(storage, this.projects)
         this.tags = new TagRepository(storage, this.projects)
+        this.characters = new CharacterRepository(storage, this.projects, this.tags)
     }
 
     listProjects(): Promise<ProjectListResult> {

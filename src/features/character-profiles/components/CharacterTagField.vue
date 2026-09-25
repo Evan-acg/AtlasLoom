@@ -71,7 +71,7 @@
                 placeholder="输入标签名称"
             />
             <button
-                class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 type="button"
                 @click="createTagFromInput"
             >

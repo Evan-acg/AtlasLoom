@@ -1,65 +1,43 @@
 <script setup lang="ts">
-    import { computed, onMounted, ref, watch } from 'vue'
-    import { useRoute, useRouter } from 'vue-router'
-    import { listCharacters, restoreCharacter } from '../api/characters'
-    import { listProjects, restoreProject } from '../api/projects'
+    import { computed, ref } from 'vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
+    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
-    const route = useRoute()
-    const router = useRouter()
-    const project = ref<Project | null>(null)
-    const characters = ref<Character[]>([])
-    const loading = ref(true)
-    const error = ref('')
+    const props = defineProps<{
+        project: Project | null
+        characters: Character[]
+        deletedCharacters: Character[]
+        loading: boolean
+        error: string
+        restoreProject: (projectId: string) => Promise<Project>
+        restoreCharacter: (characterId: string) => Promise<Character | undefined>
+        showProjectList: () => void
+    }>()
 
-    const sortedCharacters = computed(() => [...characters.value].sort((a, b) => a.name.localeCompare(b.name)))
-
-    onMounted(() => void load())
-    watch(
-        () => route.query.project,
-        () => void load()
+    const actionError = ref('')
+    const sortedCharacters = computed(() =>
+        [...props.characters, ...props.deletedCharacters].sort((a, b) => a.name.localeCompare(b.name))
     )
 
-    async function load() {
-        const projectId = route.query.project
-        if (typeof projectId !== 'string') return
-        loading.value = true
-        error.value = ''
-        try {
-            const projects = await listProjects()
-            project.value = projects.deletedProjects.find((item) => item.id === projectId) ?? null
-            const result = await listCharacters(projectId)
-            characters.value = [...result.characters, ...result.deletedCharacters]
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        } finally {
-            loading.value = false
-        }
-    }
-
     async function restoreArchivedProject() {
-        if (!project.value) return
+        if (!props.project) return
+        actionError.value = ''
         try {
-            await restoreProject(project.value.id)
-            globalThis.dispatchEvent(new globalThis.CustomEvent('atlasloom:data-changed'))
+            await props.restoreProject(props.project.id)
         } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
+            actionError.value = getCharacterProfilesErrorMessage(reason)
         }
     }
 
     async function restoreArchivedCharacter(character: Character) {
-        if (!project.value) return
+        if (!props.project) return
+        actionError.value = ''
         try {
-            await restoreCharacter(project.value.id, character.id)
-            await load()
+            await props.restoreCharacter(character.id)
         } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
+            actionError.value = getCharacterProfilesErrorMessage(reason)
         }
-    }
-
-    function showProjectList() {
-        void router.push({ query: { project: undefined, character: undefined } })
     }
 </script>
 
@@ -78,6 +56,7 @@
             <p
                 v-if="loading"
                 class="rounded-xl border border-hairline bg-surface px-5 py-8 text-center text-sm text-ink-muted"
+                role="status"
             >
                 正在读取归档项目…
             </p>
@@ -159,6 +138,14 @@
                     </p>
                 </div>
             </section>
+
+            <p
+                v-if="actionError"
+                class="mt-4 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
+                role="alert"
+            >
+                {{ actionError }}
+            </p>
         </div>
     </main>
 </template>

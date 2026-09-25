@@ -64,7 +64,7 @@
             >
                 <span class="rounded-full bg-canvas-soft px-2.5 py-1">{{ tag.name }}</span>
                 <button
-                    class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
+                    class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     type="button"
                     :aria-label="`重命名标签：${tag.name}`"
                     @click="startRename(tag)"
@@ -86,7 +86,7 @@
                         保存标签
                     </button>
                     <button
-                        class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
+                        class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         @click="cancelRename"
                     >

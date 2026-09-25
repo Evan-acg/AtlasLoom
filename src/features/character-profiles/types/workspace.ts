@@ -39,7 +39,6 @@ export interface ProjectJourneyState {
     selectedProject: ComputedRef<Project | null>
     loading: Ref<boolean>
     error: Ref<string>
-    load: (projectId: string | null) => Promise<void>
     refresh: () => Promise<void>
     create: (input: ProjectInput) => Promise<Project>
     update: (id: string, input: ProjectInput) => Promise<Project>

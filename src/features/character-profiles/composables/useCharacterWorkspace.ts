@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { Character, CharacterInput } from '../types/character'
 import type { ProjectWorkspaceCharacterAdapter } from '../types/workspace'
+import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
 export function useCharacterWorkspace(
     adapter: ProjectWorkspaceCharacterAdapter,
@@ -38,7 +39,7 @@ export function useCharacterWorkspace(
             characters.value = result.characters
             deletedCharacters.value = result.deletedCharacters
         } catch (reason) {
-            if (isCurrent(projectId, token)) error.value = errorMessage(reason)
+            if (isCurrent(projectId, token)) error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         } finally {
             if (isCurrent(projectId, token)) loading.value = false
@@ -54,7 +55,7 @@ export function useCharacterWorkspace(
             await refresh(projectId)
             return character
         } catch (reason) {
-            if (isSelectedProject(projectId)) error.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -68,7 +69,7 @@ export function useCharacterWorkspace(
             await refresh(projectId)
             return character
         } catch (reason) {
-            if (isSelectedProject(projectId)) error.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -82,7 +83,7 @@ export function useCharacterWorkspace(
             await refresh(projectId)
             return character
         } catch (reason) {
-            if (isSelectedProject(projectId)) error.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -96,7 +97,7 @@ export function useCharacterWorkspace(
             await refresh(projectId)
             return character
         } catch (reason) {
-            if (isSelectedProject(projectId)) error.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) error.value = getCharacterProfilesErrorMessage(reason)
             throw reason
         }
     }
@@ -121,8 +122,4 @@ export function useCharacterWorkspace(
         remove,
         restore
     }
-}
-
-function errorMessage(reason: unknown): string {
-    return reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
 }
