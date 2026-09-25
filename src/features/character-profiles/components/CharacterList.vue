@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { computed, ref } from 'vue'
+    import TagFilterControls from './TagFilterControls.vue'
     import type { Character } from '../types/character'
     import type { Tag } from '../types/tag'
 
@@ -17,7 +18,7 @@
 
     const search = ref('')
     const selectedTagIds = ref<string[]>([])
-    const sortedTags = computed(() => [...props.tags].sort((a, b) => a.name.localeCompare(b.name)))
+    const hasActiveFilters = computed(() => Boolean(search.value.trim() || selectedTagIds.value.length))
     const filteredCharacters = computed(() => {
         const normalizedSearch = search.value.trim().normalize('NFC').toLocaleLowerCase()
         return props.characters.filter((character) => {
@@ -33,6 +34,11 @@
 
     function characterTagNames(character: Character): string[] {
         return character.tagIds.map((tagId) => props.tags.find((tag) => tag.id === tagId)?.name ?? '标签不可用')
+    }
+
+    function resetFilters() {
+        search.value = ''
+        selectedTagIds.value = []
     }
 </script>
 
@@ -68,24 +74,18 @@
                     placeholder="姓名、别名或简介"
                 />
             </div>
-            <fieldset v-if="sortedTags.length">
-                <legend class="mb-2 text-sm font-medium">按标签筛选</legend>
-                <div class="flex flex-wrap gap-x-4 gap-y-2">
-                    <label
-                        v-for="tag in sortedTags"
-                        :key="tag.id"
-                        class="inline-flex min-h-8 items-center gap-2 text-sm text-ink-secondary"
-                    >
-                        <input
-                            v-model="selectedTagIds"
-                            type="checkbox"
-                            :aria-label="`筛选标签：${tag.name}`"
-                            :value="tag.id"
-                        />
-                        {{ tag.name }}
-                    </label>
-                </div>
-            </fieldset>
+            <TagFilterControls
+                v-model="selectedTagIds"
+                :tags="tags"
+            />
+            <button
+                v-if="hasActiveFilters"
+                class="min-h-10 self-end rounded-md border border-hairline px-3 text-sm font-medium hover:bg-white sm:col-span-2 sm:justify-self-end"
+                type="button"
+                @click="resetFilters"
+            >
+                清除筛选
+            </button>
         </div>
 
         <p

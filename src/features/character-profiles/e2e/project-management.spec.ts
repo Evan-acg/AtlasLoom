@@ -340,7 +340,12 @@ test('maintains project tags and filters the character list', async ({ page, pro
     await expect(page.getByRole('button', { name: '打开 林砚舟' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '打开 白栖迟' })).toHaveCount(0)
 
-    await page.getByLabel('筛选标签：航海').uncheck()
+    await page.getByRole('button', { name: '清除筛选' }).click()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 林砚舟' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 白栖迟' })).toBeVisible()
+
+    await page.getByLabel('筛选标签：主角').check()
     await page.getByRole('button', { name: '重命名标签：主角' }).click()
     await page.getByLabel('标签名称').fill('核心')
     await page.getByRole('button', { name: '保存标签' }).click()

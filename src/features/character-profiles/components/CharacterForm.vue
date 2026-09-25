@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { computed, ref } from 'vue'
+    import CharacterTagField from './CharacterTagField.vue'
     import type { Character, CharacterInput } from '../types/character'
     import type { Tag, TagInput } from '../types/tag'
 
@@ -20,12 +21,8 @@
 
     const draft = ref<CharacterInput>(toCharacterInput(props.character))
     const aliases = ref(props.character?.aliases.join('\n') ?? '')
-    const newTagName = ref('')
     const validationError = ref('')
-    const tagFormError = ref('')
-    const sortedTags = computed(() => [...props.tags].sort((a, b) => a.name.localeCompare(b.name)))
     const displayError = computed(() => props.error || validationError.value)
-    const displayTagError = computed(() => props.tagError || tagFormError.value)
 
     function submit() {
         const name = draft.value.name.trim()
@@ -45,22 +42,8 @@
         })
     }
 
-    async function createTagFromForm() {
-        const name = newTagName.value.trim()
-        if (!name) {
-            tagFormError.value = '请填写标签名称。'
-            return
-        }
-
-        tagFormError.value = ''
-        try {
-            const tag = await props.createTag({ name })
-            if (!tag) return
-            draft.value.tagIds = [...new Set([...(draft.value.tagIds ?? []), tag.id])]
-            newTagName.value = ''
-        } catch {
-            return
-        }
+    function updateTagIds(tagIds: string[]) {
+        draft.value.tagIds = tagIds
     }
 
     function toCharacterInput(character?: Character): CharacterInput {
@@ -137,50 +120,13 @@
                         rows="2"
                     />
                 </div>
-                <fieldset class="rounded-lg border border-hairline p-4">
-                    <legend class="px-1 text-sm font-medium">角色标签</legend>
-                    <div
-                        v-if="sortedTags.length"
-                        class="mt-1 flex flex-wrap gap-x-4 gap-y-2"
-                    >
-                        <label
-                            v-for="tag in sortedTags"
-                            :key="tag.id"
-                            class="inline-flex min-h-9 items-center gap-2 text-sm text-ink-secondary"
-                        >
-                            <input
-                                v-model="draft.tagIds"
-                                type="checkbox"
-                                :aria-label="`角色标签：${tag.name}`"
-                                :value="tag.id"
-                            />
-                            {{ tag.name }}
-                        </label>
-                    </div>
-                    <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <input
-                            v-model="newTagName"
-                            class="min-h-10 min-w-0 flex-1 rounded border border-hairline bg-white px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                            aria-label="新建标签"
-                            maxlength="80"
-                            placeholder="输入标签名称"
-                        />
-                        <button
-                            class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
-                            type="button"
-                            @click="createTagFromForm"
-                        >
-                            新建标签
-                        </button>
-                    </div>
-                    <p
-                        v-if="displayTagError"
-                        class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-                        role="alert"
-                    >
-                        {{ displayTagError }}
-                    </p>
-                </fieldset>
+                <CharacterTagField
+                    :model-value="draft.tagIds ?? []"
+                    :tags="tags"
+                    :error="tagError"
+                    :create-tag="createTag"
+                    @update:model-value="updateTagIds"
+                />
                 <div>
                     <label
                         class="mb-2 block text-sm font-medium"
