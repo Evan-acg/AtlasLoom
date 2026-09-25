@@ -43,8 +43,9 @@ The tree is illustrative; create each directory only when it has a real file. Th
 
 - A feature owns its views, components, composables, stores, assets, and types. Keep implementation details private by default.
 - When another feature or the app shell needs a feature, expose the required API from that feature's `index.ts`; never import a sibling feature's internal path.
+- App-shell development tooling may use a feature's `development.ts` entry for development-only routes or experiments; this entry is not part of the production facade and must not be imported by production feature code.
 - Put a capability in `shared/` only when it has no single feature owner and is used by at least two features. Keep single-feature helpers inside their feature.
-- `src/router/index.ts` owns the top-level route table and not-found route. When a feature owns multiple routes, export its route records from `routes.ts` through the feature's public `index.ts`; the app router composes them.
+- `src/router/index.ts` owns the top-level route table and not-found route. When a feature owns production routes, export its route records from `routes.ts` through the feature's public `index.ts`; development-only routes may be composed from the feature's `development.ts` entry.
 - Avoid circular dependencies between features. Move genuinely common behavior to `shared/` only when it meets the ownership and reuse rule above.
 
 ## Files and assets

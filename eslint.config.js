@@ -54,6 +54,10 @@ export default tseslint.config(
                 {
                     pattern: 'src/features/*/index.ts',
                     category: 'feature-public'
+                },
+                {
+                    pattern: 'src/features/*/development.ts',
+                    category: 'feature-development'
                 }
             ]
         },
@@ -75,6 +79,15 @@ export default tseslint.config(
                                 to: {
                                     element: { type: 'feature' },
                                     file: { categories: 'feature-public' }
+                                }
+                            }
+                        },
+                        {
+                            from: { element: { type: 'app' } },
+                            allow: {
+                                to: {
+                                    element: { type: 'feature' },
+                                    file: { categories: 'feature-development' }
                                 }
                             }
                         },

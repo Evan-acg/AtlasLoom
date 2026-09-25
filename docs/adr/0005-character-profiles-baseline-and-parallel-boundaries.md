@@ -131,7 +131,8 @@ monolithic workspace component, which would make behavior and ownership
 ambiguous.
 
 The baseline is a verification artifact, not a claim that the existing
-structure already satisfies the target boundaries. In particular, the
-current public entry exports both the production workspace and prototype, the
-workspace content component mixes resource journeys, and the repository still
-mixes persistence with business rules; the later tickets own those changes.
+structure already satisfies the target boundaries. In particular, at the time
+of this baseline the public entry exported both the production workspace and
+prototype, the workspace content component mixed resource journeys, and the
+repository still mixed persistence with business rules; the later tickets own
+those changes.
