@@ -138,10 +138,48 @@ export class ProjectRepository {
         })
     }
 
+    deleteProject(id: string): Promise<Project> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(id)
+            if (located.project.deletedAt) return located.project
+
+            const now = new Date().toISOString()
+            const deleted: Project = {
+                ...located.project,
+                deletedAt: now,
+                updatedAt: now,
+                history: [{ at: now, summary: '删除项目' }, ...located.project.history]
+            }
+            await this.writeMetadata(join(this.dataDirectory, located.directoryName), deleted, true)
+            return deleted
+        })
+    }
+
+    restoreProject(id: string): Promise<Project> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(id)
+            if (!located.project.deletedAt) return located.project
+
+            const now = new Date().toISOString()
+            const restored: Project = {
+                ...located.project,
+                updatedAt: now,
+                history: [{ at: now, summary: '恢复项目' }, ...located.project.history]
+            }
+            delete restored.deletedAt
+            await this.writeMetadata(join(this.dataDirectory, located.directoryName), restored, true)
+            return restored
+        })
+    }
+
     listCharacters(projectId: string): Promise<{ characters: Character[] }> {
         return this.enqueueOperation(async () => {
             const located = await this.findProject(projectId)
-            return { characters: await this.readCharacters(located) }
+            const characters = await this.readCharacters(located)
+            return {
+                characters: characters.filter((character) => !character.deletedAt),
+                deletedCharacters: characters.filter((character) => character.deletedAt)
+            }
         })
     }
 
@@ -219,6 +257,35 @@ export class ProjectRepository {
         })
     }
 
+    deleteCharacter(projectId: string, characterId: string): Promise<Character> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const characters = await this.readCharacters(located)
+            const current = characters.find((character) => character.id === characterId)
+            if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
+            if (current.deletedAt) return current
+
+            const deleted: Character = { ...current, deletedAt: new Date().toISOString() }
+            await this.writeCharacter(located, deleted)
+            return deleted
+        })
+    }
+
+    restoreCharacter(projectId: string, characterId: string): Promise<Character> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const characters = await this.readCharacters(located)
+            const current = characters.find((character) => character.id === characterId)
+            if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
+            if (!current.deletedAt) return current
+
+            const restored: Character = { ...current, updatedAt: new Date().toISOString() }
+            delete restored.deletedAt
+            await this.writeCharacter(located, restored)
+            return restored
+        })
+    }
+
     repairProject(directoryName: string, resolution: ProjectRepairResolution): Promise<void> {
         return this.enqueueOperation(async () => {
             const { issues } = await this.readProjects()
@@ -273,6 +340,7 @@ export class ProjectRepository {
         await mkdir(this.dataDirectory, { recursive: true })
         const entries = await readdir(this.dataDirectory, { withFileTypes: true })
         const projects: Project[] = []
+        const deletedProjects: Project[] = []
         const issues: ProjectStorageIssue[] = []
 
         for (const entry of entries.filter((item) => item.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -291,7 +359,8 @@ export class ProjectRepository {
                     })
                     continue
                 }
-                projects.push(project)
+                if (project.deletedAt) deletedProjects.push(project)
+                else projects.push(project)
             } catch (error) {
                 issues.push({
                     directoryName: entry.name,
@@ -301,12 +370,12 @@ export class ProjectRepository {
             }
         }
 
-        return { projects, issues }
+        return { projects, deletedProjects, issues }
     }
 
     private async findProject(id: string): Promise<LocatedProject> {
-        const { projects, issues } = await this.readProjects()
-        const project = projects.find((item) => item.id === id)
+        const { projects, deletedProjects, issues } = await this.readProjects()
+        const project = [...projects, ...deletedProjects].find((item) => item.id === id)
         if (project) return { project, directoryName: project.name }
         if (issues.some((issue) => issue.projectId === id)) {
             throw new ProjectRepositoryError('该项目的目录与元数据不一致，当前只读。', 'read-only')
@@ -398,7 +467,8 @@ export class ProjectRepository {
             abilities: parsed.abilities,
             notes: parsed.notes,
             createdAt: parsed.createdAt,
-            updatedAt: parsed.updatedAt
+            updatedAt: parsed.updatedAt,
+            ...(typeof parsed.deletedAt === 'string' ? { deletedAt: parsed.deletedAt } : {})
         }
     }
 
@@ -490,9 +560,9 @@ export class ProjectRepository {
     }
 
     private async assertNameAvailable(name: string, excludingId?: string): Promise<void> {
-        const { projects, issues } = await this.readProjects()
+        const { projects, deletedProjects, issues } = await this.readProjects()
         const key = projectNameKey(name)
-        const duplicateProject = projects.find(
+        const duplicateProject = [...projects, ...deletedProjects].find(
             (project) => project.id !== excludingId && projectNameKey(project.name) === key
         )
         const duplicateIssue = issues.find(
