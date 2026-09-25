@@ -1,1 +1,1 @@
-export { default as CharacterProfilesView } from './views/CharacterProfilesEntryView.vue'
+export { default as CharacterProfilesView } from './views/ProjectWorkspaceView.vue'

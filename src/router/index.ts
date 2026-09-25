@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { characterProfilesDevelopmentRoutes } from '@/features/character-profiles/development'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,6 +9,7 @@ const router = createRouter({
             name: 'home',
             component: () => import('@/views/HomeView.vue')
         },
+        ...characterProfilesDevelopmentRoutes,
         {
             path: '/:pathMatch(.*)*',
             name: 'not-found',
