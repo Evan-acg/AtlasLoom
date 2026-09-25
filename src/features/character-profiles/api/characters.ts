@@ -1,5 +1,5 @@
 import type { Character, CharacterInput, CharacterListResult } from '../types/character'
-import { request } from '../../../shared/utils/request'
+import { request } from './request'
 
 export async function listCharacters(projectId: string): Promise<CharacterListResult> {
     return request<CharacterListResult>(
@@ -34,7 +34,10 @@ export async function updateCharacter(
 
 export async function deleteCharacter(projectId: string, characterId: string): Promise<Character> {
     const result = await request<{ character: Character }>(
-        { url: `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}`, method: 'DELETE' },
+        {
+            url: `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}`,
+            method: 'DELETE'
+        },
         '请求本地角色服务失败。'
     )
     return result.character
