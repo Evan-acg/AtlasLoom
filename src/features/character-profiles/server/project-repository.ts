@@ -11,15 +11,21 @@ import type {
     ProjectStorageIssue,
     ProjectInput
 } from '../types/project.ts'
+import type { Character, CharacterInput } from '../types/character.ts'
 import { isRecord } from './guards.ts'
 
 const formatVersion = 1
 const metadataFileName = 'metadata.json'
 const backupFileName = 'metadata.json.bak'
+const profileDirectoryName = 'profile'
 const invalidDirectoryCharacters = /[<>:"/\\|?*]/u
 const reservedWindowsNames = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu
 
 interface ProjectMetadata extends Project {
+    formatVersion: number
+}
+
+interface CharacterMetadata extends Character {
     formatVersion: number
 }
 
@@ -126,6 +132,49 @@ export class ProjectRepository {
         })
     }
 
+    listCharacters(projectId: string): Promise<{ characters: Character[] }> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            return { characters: await this.readCharacters(located) }
+        })
+    }
+
+    createCharacter(projectId: string, input: CharacterInput): Promise<Character> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const normalized = normalizeCharacterInput(input)
+            await this.assertCharacterNameAvailable(located, normalized.name)
+
+            const now = new Date().toISOString()
+            const character: Character = {
+                id: randomUUID(),
+                projectId,
+                ...normalized,
+                createdAt: now,
+                updatedAt: now
+            }
+            await this.writeCharacter(located, character)
+            return character
+        })
+    }
+
+    updateCharacter(projectId: string, characterId: string, input: CharacterInput): Promise<Character> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const characters = await this.readCharacters(located)
+            const current = characters.find((character) => character.id === characterId)
+            if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
+
+            const normalized = normalizeCharacterInput(input)
+            await this.assertCharacterNameAvailable(located, normalized.name, characterId)
+            if (JSON.stringify({ ...current, ...normalized }) === JSON.stringify(current)) return current
+
+            const updated: Character = { ...current, ...normalized, updatedAt: new Date().toISOString() }
+            await this.writeCharacter(located, updated)
+            return updated
+        })
+    }
+
     repairProject(directoryName: string, resolution: ProjectRepairResolution): Promise<void> {
         return this.enqueueOperation(async () => {
             const { issues } = await this.readProjects()
@@ -219,6 +268,94 @@ export class ProjectRepository {
             throw new ProjectRepositoryError('该项目的目录与元数据不一致，当前只读。', 'read-only')
         }
         throw new ProjectRepositoryError('找不到该项目。', 'not-found')
+    }
+
+    private async readCharacters(located: LocatedProject): Promise<Character[]> {
+        const profilePath = join(this.dataDirectory, located.directoryName, profileDirectoryName)
+        let entries
+        try {
+            entries = await readdir(profilePath, { withFileTypes: true })
+        } catch (error) {
+            if (isFileMissingError(error)) return []
+            throw error
+        }
+
+        const characters: Character[] = []
+        for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
+            characters.push(await this.readCharacter(join(profilePath, entry.name), located.project.id))
+        }
+        return characters.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    private async readCharacter(filePath: string, projectId: string): Promise<Character> {
+        let parsed: unknown
+        try {
+            parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown
+        } catch {
+            throw new ProjectRepositoryError('角色档案无法解析为有效 JSON。', 'invalid-data')
+        }
+
+        if (
+            !isRecord(parsed) ||
+            parsed.formatVersion !== formatVersion ||
+            parsed.projectId !== projectId ||
+            typeof parsed.id !== 'string' ||
+            typeof parsed.name !== 'string' ||
+            !Array.isArray(parsed.aliases) ||
+            !parsed.aliases.every((alias) => typeof alias === 'string') ||
+            typeof parsed.introduction !== 'string' ||
+            typeof parsed.appearance !== 'string' ||
+            typeof parsed.personality !== 'string' ||
+            typeof parsed.backstory !== 'string' ||
+            typeof parsed.motivation !== 'string' ||
+            typeof parsed.abilities !== 'string' ||
+            typeof parsed.notes !== 'string' ||
+            typeof parsed.createdAt !== 'string' ||
+            typeof parsed.updatedAt !== 'string'
+        ) {
+            throw new ProjectRepositoryError('角色档案缺少必需字段或字段格式错误。', 'invalid-data')
+        }
+
+        return {
+            id: parsed.id,
+            projectId: parsed.projectId,
+            name: parsed.name,
+            aliases: parsed.aliases,
+            introduction: parsed.introduction,
+            appearance: parsed.appearance,
+            personality: parsed.personality,
+            backstory: parsed.backstory,
+            motivation: parsed.motivation,
+            abilities: parsed.abilities,
+            notes: parsed.notes,
+            createdAt: parsed.createdAt,
+            updatedAt: parsed.updatedAt
+        }
+    }
+
+    private async assertCharacterNameAvailable(
+        located: LocatedProject,
+        name: string,
+        excludingId?: string
+    ): Promise<void> {
+        const duplicate = (await this.readCharacters(located)).find(
+            (character) => character.id !== excludingId && characterNameKey(character.name) === characterNameKey(name)
+        )
+        if (duplicate) throw new ProjectRepositoryError(`角色姓名“${name}”已存在，请换一个姓名。`, 'duplicate-name')
+    }
+
+    private async writeCharacter(located: LocatedProject, character: Character): Promise<void> {
+        const profilePath = join(this.dataDirectory, located.directoryName, profileDirectoryName)
+        await mkdir(profilePath, { recursive: true })
+        const filePath = join(profilePath, `${character.id}.json`)
+        const temporaryPath = `${filePath}.${randomUUID()}.tmp`
+        const metadata: CharacterMetadata = { formatVersion, ...character }
+        try {
+            await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
+            await rename(temporaryPath, filePath)
+        } finally {
+            await rm(temporaryPath, { force: true })
+        }
     }
 
     private async assertNameAvailable(name: string, excludingId?: string): Promise<void> {
@@ -369,7 +506,27 @@ function normalizeProjectInput(input: ProjectInput): ProjectInput {
     }
 }
 
+function normalizeCharacterInput(input: CharacterInput): CharacterInput {
+    if (!input.name.trim()) throw new ProjectRepositoryError('请填写角色姓名。', 'invalid-name')
+    if (input.name.trim().length > 180) throw new ProjectRepositoryError('角色姓名过长。', 'invalid-name')
+    return {
+        name: input.name.trim(),
+        aliases: input.aliases.map((alias) => alias.trim()).filter(Boolean),
+        introduction: input.introduction.trim(),
+        appearance: input.appearance.trim(),
+        personality: input.personality.trim(),
+        backstory: input.backstory.trim(),
+        motivation: input.motivation.trim(),
+        abilities: input.abilities.trim(),
+        notes: input.notes.trim()
+    }
+}
+
 function projectNameKey(value: string): string {
+    return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
+}
+
+function characterNameKey(value: string): string {
     return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
 }
 

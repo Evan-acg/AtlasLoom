@@ -160,6 +160,88 @@ test('requires confirmation before restoring a project metadata backup', async (
     await expect(page.getByRole('row', { name: /待恢复项目/ })).toContainText('有效备份简介')
 })
 
+// Given an existing project
+// When the user creates a character with every fixed profile field
+// Then the complete profile is visible and remains available after an app restart
+test('creates and persists a complete character profile', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    const projectUrl = page.url()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await fillCharacterForm(page, {
+        name: '沈潮生',
+        aliases: '潮生\n船长',
+        introduction: '在旧港口长大的领航员。',
+        appearance: '常穿深色航海外套。',
+        personality: '谨慎但固执。',
+        backstory: '曾在风暴中失去船队。',
+        motivation: '找到失散的妹妹。',
+        abilities: '熟悉潮汐和旧航道。',
+        notes: '不要让他轻易相信陌生人。'
+    })
+    await page.getByRole('button', { name: '创建角色' }).click()
+
+    await expect(page.getByRole('heading', { name: '沈潮生' })).toBeVisible()
+    await expect(page.getByText('在旧港口长大的领航员。')).toBeVisible()
+    await expect(page.getByText('潮生、船长')).toBeVisible()
+
+    await projectApp.restart()
+    await page.goto(projectApp.url + new URL(projectUrl).search)
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await page.getByRole('button', { name: '打开 沈潮生' }).click()
+    await expect(page.getByRole('heading', { name: '沈潮生' })).toBeVisible()
+    await expect(page.getByText('不要让他轻易相信陌生人。')).toBeVisible()
+})
+
+// Given a project with a character
+// When the user edits its profile or reuses its name
+// Then the changes persist and duplicate names are rejected only within that project
+test('edits a character and enforces project-local name uniqueness', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await fillCharacterForm(page, { name: '沈潮生' })
+    await page.getByRole('button', { name: '创建角色' }).click()
+    await page.getByRole('button', { name: /编辑角色：沈潮生/ }).click()
+    await page.getByLabel('角色姓名').fill('陆照夜')
+    await page.getByLabel('角色简介').fill('新的简介。')
+    await page.getByRole('button', { name: '保存角色' }).click()
+
+    await expect(page.getByRole('heading', { name: '陆照夜' })).toBeVisible()
+    await expect(page.getByText('新的简介。')).toBeVisible()
+    await page.getByRole('button', { name: '角色列表' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await fillCharacterForm(page, { name: '陆照夜' })
+    await page.getByRole('button', { name: '创建角色' }).click()
+    await expect(page.getByRole('alert')).toContainText('已存在')
+})
+
+// Given two projects
+// When the user creates the same character name in each project
+// Then each project keeps its own independent profile
+test('allows the same character name in different projects', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await createProjectThroughUi(page, '星垂边境')
+
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await fillCharacterForm(page, { name: '沈潮生', introduction: '雾港版本。' })
+    await page.getByRole('button', { name: '创建角色' }).click()
+    await page.getByRole('button', { name: '角色列表' }).click()
+    await page.getByRole('button', { name: '全部项目' }).click()
+
+    await page.getByRole('button', { name: '打开 星垂边境' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await fillCharacterForm(page, { name: '沈潮生', introduction: '星垂版本。' })
+    await page.getByRole('button', { name: '创建角色' }).click()
+
+    await expect(page.getByRole('heading', { name: '沈潮生' })).toBeVisible()
+    await expect(page.getByText('星垂版本。')).toBeVisible()
+})
+
 async function startApp(): Promise<{ server: ViteDevServer; url: string }> {
     const server = await createServer({
         configFile: resolve(cwd(), 'vite.config.ts'),
@@ -179,4 +261,41 @@ async function createProjectThroughUi(page: Page, name: string, description = ''
     await page.getByLabel('项目名称').fill(name)
     if (description) await page.getByLabel('项目简介').fill(description)
     await page.getByRole('button', { name: '创建项目' }).click()
+}
+
+async function fillCharacterForm(
+    page: Page,
+    values: Partial<{
+        name: string
+        aliases: string
+        introduction: string
+        appearance: string
+        personality: string
+        backstory: string
+        motivation: string
+        abilities: string
+        notes: string
+    }>
+): Promise<void> {
+    await page.getByLabel('角色姓名').fill(values.name ?? '')
+    for (const field of ['别名', '角色简介', '外貌', '性格', '背景故事', '目标 / 动机', '能力', '备注']) {
+        const key =
+            field === '别名'
+                ? 'aliases'
+                : field === '角色简介'
+                  ? 'introduction'
+                  : field === '外貌'
+                    ? 'appearance'
+                    : field === '性格'
+                      ? 'personality'
+                      : field === '背景故事'
+                        ? 'backstory'
+                        : field === '目标 / 动机'
+                          ? 'motivation'
+                          : field === '能力'
+                            ? 'abilities'
+                            : 'notes'
+        const value = values[key as keyof typeof values]
+        if (value !== undefined) await page.getByLabel(field).fill(value)
+    }
 }

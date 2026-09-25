@@ -48,6 +48,52 @@ describe('project API', () => {
         await expect(listing.json()).resolves.toMatchObject({ projects: [created.project], issues: [] })
     })
 
+    // Given a persisted project
+    // When the user creates and edits a character through the local API
+    // Then the complete profile is returned and remains available through the project boundary
+    it('creates, lists, and updates a character through the local API', async () => {
+        const projectResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年' })
+        })
+        const project = (await projectResponse.json()) as { project: { id: string } }
+        const input = {
+            name: '沈潮生',
+            aliases: ['潮生'],
+            introduction: '旧港口的领航员。',
+            appearance: '深色外套。',
+            personality: '谨慎。',
+            backstory: '失去过船队。',
+            motivation: '寻找妹妹。',
+            abilities: '熟悉潮汐。',
+            notes: '保留悬念。'
+        }
+
+        const createResponse = await fetch(`${baseUrl}/projects/${project.project.id}/characters`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(input)
+        })
+        const created = (await createResponse.json()) as { character: { id: string; name: string } }
+        const listResponse = await fetch(`${baseUrl}/projects/${project.project.id}/characters`)
+        const updateResponse = await fetch(
+            `${baseUrl}/projects/${project.project.id}/characters/${created.character.id}`,
+            {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ ...input, name: '陆照夜' })
+            }
+        )
+
+        expect(createResponse.status).toBe(201)
+        expect(created.character).toMatchObject({ projectId: project.project.id, ...input })
+        await expect(listResponse.json()).resolves.toMatchObject({ characters: [created.character] })
+        await expect(updateResponse.json()).resolves.toMatchObject({
+            character: { id: created.character.id, name: '陆照夜' }
+        })
+    })
+
     // Given a project has already been created
     // When the user submits another project with the same name
     // Then the API rejects it with a conflict and keeps the existing project

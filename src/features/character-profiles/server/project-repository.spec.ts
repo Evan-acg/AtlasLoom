@@ -33,6 +33,83 @@ describe('ProjectRepository', () => {
     })
 
     // Given a persisted project
+    // When the user creates a character with the fixed profile fields
+    // Then the character is written under that project and can be read by a new repository instance
+    it('creates and lists a character in its project profile directory', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const input = {
+            name: '沈潮生',
+            aliases: ['潮生', '船长'],
+            introduction: '在旧港口长大的领航员。',
+            appearance: '常穿深色航海外套。',
+            personality: '谨慎但固执。',
+            backstory: '曾在风暴中失去船队。',
+            motivation: '找到失散的妹妹。',
+            abilities: '熟悉潮汐和旧航道。',
+            notes: '不要让他轻易相信陌生人。'
+        }
+
+        const character = await repository.createCharacter(project.id, input)
+        const reloaded = await new ProjectRepository(dataDirectory).listCharacters(project.id)
+
+        expect(character).toMatchObject({ projectId: project.id, ...input })
+        expect(reloaded).toEqual({ characters: [character] })
+        expect(await readdir(join(dataDirectory, '雾港编年', 'profile'))).toEqual([`${character.id}.json`])
+    })
+
+    // Given a project with a character
+    // When the user edits its profile or reuses its name
+    // Then the edit persists and a duplicate name is rejected within that project
+    it('updates a character and enforces project-local name uniqueness', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const created = await repository.createCharacter(project.id, {
+            name: '沈潮生',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+
+        const updated = await repository.updateCharacter(project.id, created.id, {
+            name: '陆照夜',
+            aliases: [],
+            introduction: '新的简介。',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+
+        expect(updated).toMatchObject({
+            id: created.id,
+            projectId: project.id,
+            name: '陆照夜',
+            introduction: '新的简介。'
+        })
+        await expect(
+            repository.createCharacter(project.id, {
+                name: '陆照夜',
+                aliases: [],
+                introduction: '',
+                appearance: '',
+                personality: '',
+                backstory: '',
+                motivation: '',
+                abilities: '',
+                notes: ''
+            })
+        ).rejects.toThrow('角色姓名“陆照夜”已存在')
+    })
+
+    // Given a persisted project
     // When the user changes its name and description
     // Then the project directory and metadata move together and the edit survives a new repository instance
     it('renames the project directory and preserves the updated metadata', async () => {
