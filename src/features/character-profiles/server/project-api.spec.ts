@@ -164,4 +164,69 @@ describe('project API', () => {
         const listing = await fetch(`${baseUrl}/projects`)
         await expect(listing.json()).resolves.toMatchObject({ projects: [{ name: '雾港编年' }] })
     })
+
+    // Given a project with a character
+    // When the user deletes and restores each record through the local API
+    // Then normal and deleted listings reflect each independent state
+    it('deletes and restores projects and characters through the local API', async () => {
+        const projectResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年' })
+        })
+        const project = (await projectResponse.json()) as { project: { id: string } }
+        const characterResponse = await fetch(`${baseUrl}/projects/${project.project.id}/characters`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                name: '沈潮生',
+                aliases: [],
+                introduction: '',
+                appearance: '',
+                personality: '',
+                backstory: '',
+                motivation: '',
+                abilities: '',
+                notes: ''
+            })
+        })
+        const character = (await characterResponse.json()) as { character: { id: string } }
+
+        const deleteCharacterResponse = await fetch(
+            `${baseUrl}/projects/${project.project.id}/characters/${character.character.id}`,
+            { method: 'DELETE' }
+        )
+        const deletedCharacters = await fetch(`${baseUrl}/projects/${project.project.id}/characters`)
+
+        expect(deleteCharacterResponse.status).toBe(200)
+        await expect(deletedCharacters.json()).resolves.toMatchObject({
+            characters: [],
+            deletedCharacters: [{ id: character.character.id, name: '沈潮生' }]
+        })
+
+        const deleteProjectResponse = await fetch(`${baseUrl}/projects/${project.project.id}`, { method: 'DELETE' })
+        const deletedProjects = await fetch(`${baseUrl}/projects`)
+
+        expect(deleteProjectResponse.status).toBe(200)
+        await expect(deletedProjects.json()).resolves.toMatchObject({
+            projects: [],
+            deletedProjects: [{ id: project.project.id, name: '雾港编年' }]
+        })
+
+        const restoreProjectResponse = await fetch(`${baseUrl}/projects/${project.project.id}/restore`, {
+            method: 'POST'
+        })
+        const restoreCharacterResponse = await fetch(
+            `${baseUrl}/projects/${project.project.id}/characters/${character.character.id}/restore`,
+            { method: 'POST' }
+        )
+        const restoredCharacters = await fetch(`${baseUrl}/projects/${project.project.id}/characters`)
+
+        expect(restoreProjectResponse.status).toBe(200)
+        expect(restoreCharacterResponse.status).toBe(200)
+        await expect(restoredCharacters.json()).resolves.toMatchObject({
+            characters: [{ id: character.character.id, name: '沈潮生' }],
+            deletedCharacters: []
+        })
+    })
 })

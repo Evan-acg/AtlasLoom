@@ -10,5 +10,9 @@ export async function request<T>(path: string, options: RequestInit, fallbackMes
         throw new Error(typeof message === 'string' ? message : fallbackMessage)
     }
 
+    if ((options.method ?? 'GET').toUpperCase() !== 'GET') {
+        globalThis.dispatchEvent(new Event('atlasloom:data-changed'))
+    }
+
     return body as T
 }

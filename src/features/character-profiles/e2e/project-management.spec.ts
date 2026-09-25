@@ -123,6 +123,48 @@ test('rejects duplicate project names on creation and rename in the browser', as
     await expect(page.getByRole('row', { name: /Atlas Loom/ })).toHaveCount(1)
 })
 
+// Given a project with a character
+// When the user deletes and restores the character and project
+// Then each record disappears from normal browsing without losing the saved data
+test('deletes and restores projects and characters from the browser', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await createCharacterThroughUi(page, { name: '沈潮生', introduction: '旧港口的领航员。' })
+
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: '删除角色' }).click()
+    await page.getByRole('button', { name: '角色列表' }).click()
+    await expect(page.getByRole('heading', { name: '已删除角色' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '恢复 沈潮生' })).toBeVisible()
+
+    await page.getByRole('button', { name: '恢复 沈潮生' }).click()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+
+    await page.getByRole('button', { name: '全部项目' }).click()
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: '删除项目' }).click()
+    await page.getByRole('button', { name: '全部项目' }).click()
+
+    await expect(page.getByRole('heading', { name: '已删除项目' })).toBeVisible()
+    await expect(page.getByText('雾港编年')).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 雾港编年' })).toBeVisible()
+
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await expect(page.getByText('项目已删除')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '归档角色' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '沈潮生' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '＋ 新建角色' })).toHaveCount(0)
+    await page.getByRole('button', { name: '恢复项目' }).click()
+    await expect(page.getByRole('button', { name: '删除项目' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+
+    await projectApp.restart()
+    await page.goto(projectApp.url)
+    await expect(page.getByRole('row', { name: /雾港编年/ })).toBeVisible()
+})
+
 // Given a project folder whose name no longer matches its metadata
 // When the user chooses to keep the folder name
 // Then the project returns to the usable list under that name

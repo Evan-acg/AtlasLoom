@@ -19,6 +19,8 @@ export default defineConfig({
             'state-error': '#991b1b',
             'state-error-surface': '#fef2f2',
             'state-error-border': '#fecaca',
+            'state-warning': '#92400e',
+            'state-warning-surface': '#fffbeb',
             'state-warning-border': '#fcd34d'
         },
         fontFamily: {
