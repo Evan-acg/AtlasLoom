@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { CharacterInput } from '../types/character.ts'
 import type { ProjectInput, ProjectRepairResolution } from '../types/project.ts'
+import type { TagInput } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 import { ProjectRepository, ProjectRepositoryError } from './project-repository.ts'
 
@@ -39,7 +40,8 @@ async function handleRequest(
         return
     }
 
-    const pathname = new URL(request.url ?? '/', 'http://localhost').pathname
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const pathname = url.pathname
     const segments = pathname.split('/').filter(Boolean)
     if (segments[0] !== 'projects') {
         sendJson(response, 404, { error: '找不到请求的本地 API。' })
@@ -54,6 +56,27 @@ async function handleRequest(
     if (segments.length === 1 && request.method === 'POST') {
         const project = await repository.createProject(await readProjectInput(request))
         sendJson(response, 201, { project })
+        return
+    }
+
+    if (segments.length === 3 && segments[2] === 'tags' && request.method === 'GET') {
+        sendJson(response, 200, await repository.listTags(decodeSegment(segments[1], '项目 ID')))
+        return
+    }
+
+    if (segments.length === 3 && segments[2] === 'tags' && request.method === 'POST') {
+        const tag = await repository.createTag(decodeSegment(segments[1], '项目 ID'), await readTagInput(request))
+        sendJson(response, 201, { tag })
+        return
+    }
+
+    if (segments.length === 4 && segments[2] === 'tags' && request.method === 'PATCH') {
+        const tag = await repository.renameTag(
+            decodeSegment(segments[1], '项目 ID'),
+            decodeSegment(segments[3], '标签 ID'),
+            await readTagInput(request)
+        )
+        sendJson(response, 200, { tag })
         return
     }
 
@@ -129,10 +152,18 @@ async function readCharacterInput(request: IncomingMessage): Promise<CharacterIn
         'abilities',
         'notes'
     ] as const
-    if (!isRecord(body) || !fields.every((field) => typeof body[field] === 'string') || !Array.isArray(body.aliases)) {
+    if (
+        !isRecord(body) ||
+        !fields.every((field) => typeof body[field] === 'string') ||
+        !Array.isArray(body.aliases) ||
+        (body.tagIds !== undefined && !Array.isArray(body.tagIds))
+    ) {
         throw new ApiError('角色档案字段格式无效。', 400)
     }
-    if (!body.aliases.every((alias) => typeof alias === 'string')) {
+    if (
+        !body.aliases.every((alias) => typeof alias === 'string') ||
+        (Array.isArray(body.tagIds) && !body.tagIds.every((tagId) => typeof tagId === 'string'))
+    ) {
         throw new ApiError('角色别名必须是文本列表。', 400)
     }
     const text = (field: (typeof fields)[number]): string => body[field] as string
@@ -140,6 +171,7 @@ async function readCharacterInput(request: IncomingMessage): Promise<CharacterIn
     return {
         name: text('name'),
         aliases: body.aliases as string[],
+        tagIds: Array.isArray(body.tagIds) ? (body.tagIds as string[]) : [],
         introduction: text('introduction'),
         appearance: text('appearance'),
         personality: text('personality'),
@@ -148,6 +180,14 @@ async function readCharacterInput(request: IncomingMessage): Promise<CharacterIn
         abilities: text('abilities'),
         notes: text('notes')
     }
+}
+
+async function readTagInput(request: IncomingMessage): Promise<TagInput> {
+    const body = await readJsonRequestBody(request)
+    if (!isRecord(body) || typeof body.name !== 'string') {
+        throw new ApiError('标签名称必须是文本。', 400)
+    }
+    return { name: body.name }
 }
 
 async function readProjectRepairInput(

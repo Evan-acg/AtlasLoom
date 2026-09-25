@@ -110,6 +110,55 @@ describe('ProjectRepository', () => {
     })
 
     // Given a persisted project
+    // When the user creates and renames a project tag
+    // Then the tag remains project-scoped and existing character references resolve to its new name
+    it('persists project tags and renames assigned tags', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+
+        const tag = await repository.createTag(project.id, { name: '航海' })
+        const character = await repository.createCharacter(project.id, {
+            name: '沈潮生',
+            aliases: [],
+            tagIds: [tag.id],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+        const renamed = await repository.renameTag(project.id, tag.id, { name: '港口' })
+        const reloaded = await new ProjectRepository(dataDirectory).listTags(project.id)
+        const reloadedCharacters = await new ProjectRepository(dataDirectory).listCharacters(project.id)
+
+        expect(renamed).toMatchObject({ id: tag.id, projectId: project.id, name: '港口' })
+        expect(reloaded).toEqual({ tags: [renamed] })
+        expect(reloadedCharacters.characters[0]).toMatchObject({ id: character.id, tagIds: [tag.id] })
+        await expect(
+            readFile(join(dataDirectory, '雾港编年', 'tags', `${tag.id}.json`), 'utf8').then((contents) =>
+                JSON.parse(contents)
+            )
+        ).resolves.toMatchObject({ name: '港口', projectId: project.id })
+    })
+
+    // Given two projects
+    // When the user creates the same tag name in each project
+    // Then the tag namespaces stay independent and duplicates are rejected only within one project
+    it('scopes tag names to their project', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const firstProject = await repository.createProject({ name: '雾港编年', description: '' })
+        const secondProject = await repository.createProject({ name: '星垂边境', description: '' })
+
+        await repository.createTag(firstProject.id, { name: '主角' })
+        const secondTag = await repository.createTag(secondProject.id, { name: '主角' })
+
+        expect(secondTag.projectId).toBe(secondProject.id)
+        await expect(repository.createTag(firstProject.id, { name: '主角' })).rejects.toThrow('已存在')
+    })
+
+    // Given a persisted project
     // When the user changes its name and description
     // Then the project directory and metadata move together and the edit survives a new repository instance
     it('renames the project directory and preserves the updated metadata', async () => {

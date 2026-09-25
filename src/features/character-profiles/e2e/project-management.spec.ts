@@ -242,6 +242,58 @@ test('allows the same character name in different projects', async ({ page, proj
     await expect(page.getByText('星垂版本。')).toBeVisible()
 })
 
+// Given a project with several characters
+// When the user searches, combines tag filters, and renames a project tag
+// Then tags stay project-scoped, use AND semantics, and persist with character assignments
+test('maintains project tags and filters the character list', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+
+    await createCharacterThroughUi(page, {
+        name: '沈潮生',
+        aliases: '潮生',
+        introduction: '旧港口的领航员。',
+        tags: ['主角', '航海']
+    })
+    await page.getByRole('button', { name: '角色列表' }).click()
+    await createCharacterThroughUi(page, {
+        name: '林砚舟',
+        introduction: '负责修复旧船的工匠。',
+        tags: ['航海']
+    })
+    await page.getByRole('button', { name: '角色列表' }).click()
+    await createCharacterThroughUi(page, {
+        name: '白栖迟',
+        introduction: '在城中经营书店。',
+        tags: ['主角']
+    })
+    await page.getByRole('button', { name: '角色列表' }).click()
+
+    const search = page.getByLabel('搜索角色')
+    await search.fill('潮生')
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 林砚舟' })).toHaveCount(0)
+
+    await search.fill('')
+    await page.getByLabel('筛选标签：主角').check()
+    await page.getByLabel('筛选标签：航海').check()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 林砚舟' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '打开 白栖迟' })).toHaveCount(0)
+
+    await page.getByLabel('筛选标签：航海').uncheck()
+    await page.getByRole('button', { name: '重命名标签：主角' }).click()
+    await page.getByLabel('标签名称').fill('核心')
+    await page.getByRole('button', { name: '保存标签' }).click()
+    await expect(page.getByLabel('筛选标签：核心')).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByLabel('筛选标签：核心')).toBeVisible()
+    await page.getByRole('button', { name: '打开 沈潮生' }).click()
+    await expect(page.getByText('核心')).toBeVisible()
+})
+
 async function startApp(): Promise<{ server: ViteDevServer; url: string }> {
     const server = await createServer({
         configFile: resolve(cwd(), 'vite.config.ts'),
@@ -261,6 +313,31 @@ async function createProjectThroughUi(page: Page, name: string, description = ''
     await page.getByLabel('项目名称').fill(name)
     if (description) await page.getByLabel('项目简介').fill(description)
     await page.getByRole('button', { name: '创建项目' }).click()
+}
+
+async function createCharacterThroughUi(
+    page: Page,
+    values: Partial<{
+        name: string
+        aliases: string
+        introduction: string
+        tags: string[]
+    }>
+): Promise<void> {
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await page.getByLabel('角色姓名').fill(values.name ?? '')
+    if (values.aliases !== undefined) await page.getByLabel('别名').fill(values.aliases)
+    if (values.introduction !== undefined) await page.getByLabel('角色简介').fill(values.introduction)
+
+    for (const tag of values.tags ?? []) {
+        const tagCheckbox = page.getByLabel(`角色标签：${tag}`)
+        if ((await tagCheckbox.count()) === 0) {
+            await page.getByLabel('新建标签').fill(tag)
+            await page.getByRole('button', { name: '新建标签' }).click()
+        }
+        await tagCheckbox.check()
+    }
+    await page.getByRole('button', { name: '创建角色' }).click()
 }
 
 async function fillCharacterForm(

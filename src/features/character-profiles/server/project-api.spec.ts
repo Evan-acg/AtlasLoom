@@ -94,6 +94,56 @@ describe('project API', () => {
         })
     })
 
+    // Given a persisted project
+    // When the user creates and renames a tag through the local API
+    // Then character assignments remain addressable by the stable tag ID
+    it('creates and renames project tags through the local API', async () => {
+        const projectResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年' })
+        })
+        const project = (await projectResponse.json()) as { project: { id: string } }
+
+        const createTagResponse = await fetch(`${baseUrl}/projects/${project.project.id}/tags`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '航海' })
+        })
+        const createdTag = (await createTagResponse.json()) as { tag: { id: string; name: string } }
+        const createCharacterResponse = await fetch(`${baseUrl}/projects/${project.project.id}/characters`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                name: '沈潮生',
+                aliases: ['潮生'],
+                tagIds: [createdTag.tag.id],
+                introduction: '旧港口的领航员。',
+                appearance: '',
+                personality: '',
+                backstory: '',
+                motivation: '',
+                abilities: '',
+                notes: ''
+            })
+        })
+        const renameTagResponse = await fetch(`${baseUrl}/projects/${project.project.id}/tags/${createdTag.tag.id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '港口' })
+        })
+        const tagListing = await fetch(`${baseUrl}/projects/${project.project.id}/tags`)
+        const characterListing = await fetch(`${baseUrl}/projects/${project.project.id}/characters`)
+
+        expect(createTagResponse.status).toBe(201)
+        expect(createCharacterResponse.status).toBe(201)
+        expect(renameTagResponse.status).toBe(200)
+        await expect(tagListing.json()).resolves.toMatchObject({ tags: [{ id: createdTag.tag.id, name: '港口' }] })
+        await expect(characterListing.json()).resolves.toMatchObject({
+            characters: [{ name: '沈潮生', tagIds: [createdTag.tag.id] }]
+        })
+    })
+
     // Given a project has already been created
     // When the user submits another project with the same name
     // Then the API rejects it with a conflict and keeps the existing project

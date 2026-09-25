@@ -3,6 +3,7 @@ export interface Character {
     projectId: string
     name: string
     aliases: string[]
+    tagIds: string[]
     introduction: string
     appearance: string
     personality: string
@@ -14,7 +15,9 @@ export interface Character {
     updatedAt: string
 }
 
-export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>
+export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt' | 'tagIds'> & {
+    tagIds?: string[]
+}
 
 export interface CharacterListResult {
     characters: Character[]
