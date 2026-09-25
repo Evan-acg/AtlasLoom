@@ -141,6 +141,11 @@ describe('ProjectRepository', () => {
                 JSON.parse(contents)
             )
         ).resolves.toMatchObject({ name: '港口', projectId: project.id })
+        await expect(
+            readFile(join(dataDirectory, '雾港编年', 'tags', `${tag.id}.json.bak`), 'utf8').then((contents) =>
+                JSON.parse(contents)
+            )
+        ).resolves.toMatchObject({ name: '航海', projectId: project.id })
     })
 
     // Given two projects
@@ -156,6 +161,19 @@ describe('ProjectRepository', () => {
 
         expect(secondTag.projectId).toBe(secondProject.id)
         await expect(repository.createTag(firstProject.id, { name: '主角' })).rejects.toThrow('已存在')
+    })
+
+    // Given a project with valid and damaged tag files
+    // When the user loads its tags
+    // Then the damaged tag is isolated and valid tags remain available
+    it('isolates damaged tag files while listing tags', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const validTag = await repository.createTag(project.id, { name: '主角' })
+        const damagedTag = await repository.createTag(project.id, { name: '待修复' })
+        await writeFile(join(dataDirectory, '雾港编年', 'tags', `${damagedTag.id}.json`), '{invalid json')
+
+        await expect(new ProjectRepository(dataDirectory).listTags(project.id)).resolves.toEqual({ tags: [validTag] })
     })
 
     // Given a persisted project

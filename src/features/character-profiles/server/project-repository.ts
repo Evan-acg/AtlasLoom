@@ -177,7 +177,7 @@ export class ProjectRepository {
             if (current.name === normalized.name) return current
 
             const updated: Tag = { ...current, ...normalized, updatedAt: new Date().toISOString() }
-            await this.writeTag(located, updated)
+            await this.writeTag(located, updated, true)
             return updated
         })
     }
@@ -343,7 +343,12 @@ export class ProjectRepository {
 
         const tags: Tag[] = []
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
-            tags.push(await this.readTag(join(tagsPath, entry.name), located.project.id))
+            try {
+                tags.push(await this.readTag(join(tagsPath, entry.name), located.project.id))
+            } catch (error) {
+                if (error instanceof ProjectRepositoryError && error.code === 'invalid-data') continue
+                throw error
+            }
         }
         return tags.sort((a, b) => a.name.localeCompare(b.name))
     }
@@ -458,10 +463,22 @@ export class ProjectRepository {
         }
     }
 
-    private async writeTag(located: LocatedProject, tag: Tag): Promise<void> {
+    private async writeTag(located: LocatedProject, tag: Tag, preservePrevious = false): Promise<void> {
         const tagsPath = join(this.dataDirectory, located.directoryName, tagsDirectoryName)
         await mkdir(tagsPath, { recursive: true })
         const filePath = join(tagsPath, `${tag.id}.json`)
+        if (preservePrevious) {
+            const previousContents = await readFile(filePath, 'utf8')
+            await this.readTag(filePath, tag.projectId)
+            const backupPath = `${filePath}.bak`
+            const temporaryBackupPath = `${backupPath}.${randomUUID()}.tmp`
+            try {
+                await writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
+                await rename(temporaryBackupPath, backupPath)
+            } finally {
+                await rm(temporaryBackupPath, { force: true })
+            }
+        }
         const temporaryPath = `${filePath}.${randomUUID()}.tmp`
         const metadata: TagMetadata = { formatVersion, ...tag }
         try {

@@ -595,7 +595,7 @@
                                                 maxlength="80"
                                             />
                                             <button
-                                                class="min-h-9 rounded-md bg-primary px-3 text-white hover:bg-primary-active"
+                                                class="min-h-9 rounded-full bg-primary px-3 text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                                 type="button"
                                                 @click="saveTagRename"
                                             >
