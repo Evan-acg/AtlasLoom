@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { CharacterInput } from '../types/character.ts'
 import type { ProjectInput, ProjectRepairResolution } from '../types/project.ts'
 import { isRecord } from './guards.ts'
 import { ProjectRepository, ProjectRepositoryError } from './project-repository.ts'
@@ -56,6 +57,30 @@ async function handleRequest(
         return
     }
 
+    if (segments.length === 3 && segments[2] === 'characters' && request.method === 'GET') {
+        sendJson(response, 200, await repository.listCharacters(decodeSegment(segments[1], '项目 ID')))
+        return
+    }
+
+    if (segments.length === 3 && segments[2] === 'characters' && request.method === 'POST') {
+        const character = await repository.createCharacter(
+            decodeSegment(segments[1], '项目 ID'),
+            await readCharacterInput(request)
+        )
+        sendJson(response, 201, { character })
+        return
+    }
+
+    if (segments.length === 4 && segments[2] === 'characters' && request.method === 'PATCH') {
+        const character = await repository.updateCharacter(
+            decodeSegment(segments[1], '项目 ID'),
+            decodeSegment(segments[3], '角色 ID'),
+            await readCharacterInput(request)
+        )
+        sendJson(response, 200, { character })
+        return
+    }
+
     if (segments.length === 2 && segments[1] === 'repair' && request.method === 'POST') {
         const input = await readProjectRepairInput(request)
         await repository.repairProject(input.directoryName, input.resolution)
@@ -90,6 +115,39 @@ async function readProjectInput(request: IncomingMessage): Promise<ProjectInput>
     }
 
     return { name: body.name, description: typeof body.description === 'string' ? body.description : '' }
+}
+
+async function readCharacterInput(request: IncomingMessage): Promise<CharacterInput> {
+    const body = await readJsonRequestBody(request)
+    const fields = [
+        'name',
+        'introduction',
+        'appearance',
+        'personality',
+        'backstory',
+        'motivation',
+        'abilities',
+        'notes'
+    ] as const
+    if (!isRecord(body) || !fields.every((field) => typeof body[field] === 'string') || !Array.isArray(body.aliases)) {
+        throw new ApiError('角色档案字段格式无效。', 400)
+    }
+    if (!body.aliases.every((alias) => typeof alias === 'string')) {
+        throw new ApiError('角色别名必须是文本列表。', 400)
+    }
+    const text = (field: (typeof fields)[number]): string => body[field] as string
+
+    return {
+        name: text('name'),
+        aliases: body.aliases as string[],
+        introduction: text('introduction'),
+        appearance: text('appearance'),
+        personality: text('personality'),
+        backstory: text('backstory'),
+        motivation: text('motivation'),
+        abilities: text('abilities'),
+        notes: text('notes')
+    }
 }
 
 async function readProjectRepairInput(
@@ -175,4 +233,12 @@ function errorMessage(error: unknown): string {
 
 function isProjectRepairResolution(value: unknown): value is ProjectRepairResolution {
     return value === 'directory-name' || value === 'metadata-name' || value === 'restore-backup'
+}
+
+function decodeSegment(value: string | undefined, label: string): string {
+    try {
+        return decodeURIComponent(value ?? '')
+    } catch {
+        throw new ApiError(`${label}格式无效。`, 400)
+    }
 }
