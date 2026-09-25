@@ -13,6 +13,7 @@ export interface Character {
     notes: string
     createdAt: string
     updatedAt: string
+    deletedAt?: string
 }
 
 export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt' | 'tagIds'> & {
@@ -21,4 +22,5 @@ export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 
 
 export interface CharacterListResult {
     characters: Character[]
+    deletedCharacters: Character[]
 }

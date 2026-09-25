@@ -28,6 +28,7 @@ export interface ProjectStorageIssue {
 
 export interface ProjectListResult {
     projects: Project[]
+    deletedProjects: Project[]
     issues: ProjectStorageIssue[]
 }
 

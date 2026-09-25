@@ -54,7 +54,7 @@ describe('ProjectRepository', () => {
         const reloaded = await new ProjectRepository(dataDirectory).listCharacters(project.id)
 
         expect(character).toMatchObject({ projectId: project.id, ...input })
-        expect(reloaded).toEqual({ characters: [character] })
+        expect(reloaded).toEqual({ characters: [character], deletedCharacters: [] })
         expect(await readdir(join(dataDirectory, '雾港编年', 'profile'))).toEqual([`${character.id}.json`])
     })
 
@@ -351,5 +351,100 @@ describe('ProjectRepository', () => {
 
         expect(listing.projects).toMatchObject([{ id: project.id, description: '有效备份' }])
         expect(listing.issues).toEqual([])
+    })
+
+    // Given a project with a character
+    // When the user soft-deletes and restores the project
+    // Then the project is separated from normal browsing while its character deletion state is preserved
+    it('soft-deletes and restores a project without changing its characters', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const character = await repository.createCharacter(project.id, {
+            name: '沈潮生',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+
+        const deletedProject = await repository.deleteProject(project.id)
+        expect(deletedProject.deletedAt).toEqual(expect.any(String))
+        expect(deletedProject.history[0]?.summary).toBe('删除项目')
+        await expect(repository.listProjects()).resolves.toMatchObject({
+            projects: [],
+            deletedProjects: [deletedProject],
+            issues: []
+        })
+        await expect(repository.listCharacters(project.id)).resolves.toEqual({
+            characters: [character],
+            deletedCharacters: []
+        })
+        await expect(repository.createProject({ name: '雾港编年', description: '不能复用名称' })).rejects.toThrow(
+            '已存在'
+        )
+
+        const restoredProject = await new ProjectRepository(dataDirectory).restoreProject(project.id)
+        expect(restoredProject.deletedAt).toBeUndefined()
+        expect(restoredProject.history[0]?.summary).toBe('恢复项目')
+        await expect(new ProjectRepository(dataDirectory).listProjects()).resolves.toMatchObject({
+            projects: [restoredProject],
+            deletedProjects: [],
+            issues: []
+        })
+    })
+
+    // Given a project with two characters
+    // When the user deletes one character and then deletes and restores the project
+    // Then only the character's own deletion state controls its visibility after project recovery
+    it('soft-deletes and restores characters independently from their project', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const activeCharacter = await repository.createCharacter(project.id, {
+            name: '沈潮生',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+        const deletedCharacter = await repository.createCharacter(project.id, {
+            name: '林砚舟',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+
+        const deleted = await repository.deleteCharacter(project.id, deletedCharacter.id)
+        expect(deleted.deletedAt).toEqual(expect.any(String))
+        await expect(repository.listCharacters(project.id)).resolves.toEqual({
+            characters: [activeCharacter],
+            deletedCharacters: [deleted]
+        })
+
+        await repository.deleteProject(project.id)
+        await repository.restoreProject(project.id)
+        await expect(new ProjectRepository(dataDirectory).listCharacters(project.id)).resolves.toEqual({
+            characters: [activeCharacter],
+            deletedCharacters: [deleted]
+        })
+
+        const restored = await repository.restoreCharacter(project.id, deletedCharacter.id)
+        expect(restored.deletedAt).toBeUndefined()
+        await expect(repository.listCharacters(project.id)).resolves.toMatchObject({
+            characters: expect.arrayContaining([activeCharacter, restored]),
+            deletedCharacters: []
+        })
     })
 })
