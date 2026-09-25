@@ -29,6 +29,24 @@ export async function updateProject(id: string, input: ProjectInput): Promise<Pr
     return result.project
 }
 
+export async function deleteProject(id: string): Promise<Project> {
+    const result = await request<{ project: Project }>(
+        `/projects/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+        '请求本地项目服务失败。'
+    )
+    return result.project
+}
+
+export async function restoreProject(id: string): Promise<Project> {
+    const result = await request<{ project: Project }>(
+        `/projects/${encodeURIComponent(id)}/restore`,
+        { method: 'POST' },
+        '请求本地项目服务失败。'
+    )
+    return result.project
+}
+
 export async function repairProject(directoryName: string, resolution: ProjectRepairResolution): Promise<void> {
     await request<{ repaired: boolean }>(
         '/projects/repair',

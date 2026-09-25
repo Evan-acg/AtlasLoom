@@ -104,10 +104,45 @@ async function handleRequest(
         return
     }
 
+    if (segments.length === 4 && segments[2] === 'characters' && request.method === 'DELETE') {
+        const character = await repository.deleteCharacter(
+            decodeSegment(segments[1], '项目 ID'),
+            decodeSegment(segments[3], '角色 ID')
+        )
+        sendJson(response, 200, { character })
+        return
+    }
+
+    if (
+        segments.length === 5 &&
+        segments[2] === 'characters' &&
+        segments[4] === 'restore' &&
+        request.method === 'POST'
+    ) {
+        const character = await repository.restoreCharacter(
+            decodeSegment(segments[1], '项目 ID'),
+            decodeSegment(segments[3], '角色 ID')
+        )
+        sendJson(response, 200, { character })
+        return
+    }
+
     if (segments.length === 2 && segments[1] === 'repair' && request.method === 'POST') {
         const input = await readProjectRepairInput(request)
         await repository.repairProject(input.directoryName, input.resolution)
         sendJson(response, 200, { repaired: true })
+        return
+    }
+
+    if (segments.length === 3 && segments[2] === 'restore' && request.method === 'POST') {
+        const project = await repository.restoreProject(decodeSegment(segments[1], '项目 ID'))
+        sendJson(response, 200, { project })
+        return
+    }
+
+    if (segments.length === 2 && request.method === 'DELETE') {
+        const project = await repository.deleteProject(decodeSegment(segments[1], '项目 ID'))
+        sendJson(response, 200, { project })
         return
     }
 
