@@ -249,6 +249,7 @@ test('maintains project tags and filters the character list', async ({ page, pro
     await page.goto(projectApp.url)
     await createProjectThroughUi(page, '雾港编年')
     await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    const projectUrl = page.url()
 
     await createCharacterThroughUi(page, {
         name: '沈潮生',
@@ -288,7 +289,8 @@ test('maintains project tags and filters the character list', async ({ page, pro
     await page.getByRole('button', { name: '保存标签' }).click()
     await expect(page.getByLabel('筛选标签：核心')).toBeVisible()
 
-    await page.reload()
+    await projectApp.restart()
+    await page.goto(projectApp.url + new URL(projectUrl).search)
     await expect(page.getByLabel('筛选标签：核心')).toBeVisible()
     await page.getByRole('button', { name: '打开 沈潮生' }).click()
     await expect(page.getByText('核心')).toBeVisible()
