@@ -5,7 +5,7 @@ import type { BackupArchive, ProjectBackupBundle } from '../types/backup.ts'
 import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
 import { nodeProjectFileSystem, type ProjectFileSystem } from './project-file-system.ts'
-import { ProjectJsonCodecError, projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
+import { projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
 
 const metadataFileName = 'metadata.json'
 const backupFileName = 'metadata.json.bak'
@@ -127,10 +127,9 @@ export class ProjectFileStorage {
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
-            } catch (error) {
+            } catch {
                 if (strict) throw new ProjectStorageError('invalid-record', `角色文件“${entry.name}”无效。`)
-                if (error instanceof ProjectJsonCodecError) throw error
-                throw new ProjectStorageError('invalid-record', 'Character file is unreadable.')
+                continue
             }
         }
         return characters.sort((a, b) => a.name.localeCompare(b.name))
@@ -194,6 +193,10 @@ export class ProjectFileStorage {
 
         try {
             await this.writeDataset(stagingDirectory, bundles)
+            if (!(await this.directoryExists(this.dataDirectory))) {
+                await this.fileSystem.rename(stagingDirectory, this.dataDirectory)
+                return
+            }
             await this.fileSystem.rename(this.dataDirectory, previousDirectory)
             try {
                 await this.fileSystem.rename(stagingDirectory, this.dataDirectory)
@@ -203,6 +206,16 @@ export class ProjectFileStorage {
             }
         } finally {
             await this.fileSystem.rm(stagingDirectory, { recursive: true, force: true })
+        }
+    }
+
+    private async directoryExists(directory: string): Promise<boolean> {
+        try {
+            await this.fileSystem.stat(directory)
+            return true
+        } catch (error) {
+            if (isFileMissingError(error)) return false
+            throw error
         }
     }
 

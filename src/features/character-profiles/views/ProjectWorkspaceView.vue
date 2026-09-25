@@ -120,6 +120,7 @@
         @restore-project="workspace.restoreProject"
         @restore-character="workspace.restoreCharacter"
         @open-project="openProject"
+        @open-character="openCharacter"
     />
     <ArchivedProjectView
         v-if="isArchivedProject"
