@@ -32,10 +32,10 @@
 git fetch origin --prune
 git switch <base-branch>
 git pull --ff-only
-git branch -d <work-branch>
+git branch -D <work-branch>
 ```
 
-其中 `<base-branch>` 是本次 PR 的目标分支，`<work-branch>` 是已合并的本地工作分支。若本地分支仍有未合并提交，必须先确认是否需要保留，不得使用 `-D` 强制删除。
+其中 `<base-branch>` 是本次 PR 的目标分支，`<work-branch>` 是已合并的本地工作分支。仓库使用 Squash merge，工作分支提交通常不会成为目标分支的祖先，因此必须先确认 PR 已合并且没有需要保留的本地独有提交，再使用 `-D` 删除。PR 未合并或仍需保留本地提交时，禁止删除该分支。
 
 ## Issue 与 PR
 

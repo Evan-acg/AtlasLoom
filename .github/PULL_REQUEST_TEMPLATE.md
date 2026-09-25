@@ -40,5 +40,5 @@ Closes #
 git fetch origin --prune
 git switch <base-branch>
 git pull --ff-only
-git branch -d <work-branch>
+git branch -D <work-branch>
 ```
