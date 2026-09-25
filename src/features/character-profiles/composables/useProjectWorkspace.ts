@@ -1,124 +1,25 @@
 import { ref } from 'vue'
-import type { Character, CharacterInput } from '../types/character'
-import type { ProjectInput, ProjectRepairResolution } from '../types/project'
 import type { Tag, TagInput } from '../types/tag'
 import type { ProjectWorkspaceAdapters } from '../types/workspace'
+import { useCharacterWorkspace } from './useCharacterWorkspace'
 import { useProjectState } from './useProjectState'
 
 export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     const projectState = useProjectState(adapters.projects)
-    const characters = ref<Character[]>([])
-    const deletedCharacters = ref<Character[]>([])
+    const characterState = useCharacterWorkspace(adapters.characters, projectState.selectedProjectId)
     const tags = ref<Tag[]>([])
-    const charactersLoading = ref(false)
-    const characterError = ref('')
     const tagError = ref('')
     let loadToken = 0
 
     async function load(projectId: string | null = null) {
         const token = ++loadToken
-        characters.value = []
-        deletedCharacters.value = []
+        characterState.reset()
         tags.value = []
-        charactersLoading.value = false
-        characterError.value = ''
         tagError.value = ''
         await projectState.load(projectId)
 
-        if (!projectId) {
-            return
-        }
-
-        if (token !== loadToken || projectState.error.value) return
-        await Promise.allSettled([refreshCharacters(projectId, token), refreshTags(projectId, token)])
-    }
-
-    async function createProject(input: ProjectInput) {
-        return projectState.create(input)
-    }
-
-    async function updateProject(id: string, input: ProjectInput) {
-        return projectState.update(id, input)
-    }
-
-    async function deleteProject(id: string) {
-        return projectState.remove(id)
-    }
-
-    async function restoreProject(id: string) {
-        return projectState.restore(id)
-    }
-
-    async function repairProject(directoryName: string, resolution: ProjectRepairResolution) {
-        return projectState.repair(directoryName, resolution)
-    }
-
-    function clearProjectError() {
-        projectState.clearError()
-    }
-
-    async function refreshCharacters(projectId = projectState.selectedProjectId.value, token = loadToken) {
-        if (!projectId) {
-            characters.value = []
-            deletedCharacters.value = []
-            return
-        }
-        charactersLoading.value = true
-        characterError.value = ''
-        try {
-            const result = await adapters.characters.list(projectId)
-            if (token !== loadToken || projectState.selectedProjectId.value !== projectId) return
-            characters.value = result.characters
-            deletedCharacters.value = result.deletedCharacters
-        } catch (reason) {
-            if (token === loadToken && projectState.selectedProjectId.value === projectId)
-                characterError.value = errorMessage(reason)
-            throw reason
-        } finally {
-            if (token === loadToken) charactersLoading.value = false
-        }
-    }
-
-    async function createCharacter(input: CharacterInput) {
-        const projectId = projectState.selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.create(projectId, input)
-            if (projectState.selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function updateCharacter(characterId: string, input: CharacterInput) {
-        const projectId = projectState.selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.update(projectId, characterId, input)
-            if (projectState.selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function deleteCharacter(characterId: string) {
-        const projectId = projectState.selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.remove(projectId, characterId)
-            if (projectState.selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
+        if (!projectId || token !== loadToken || projectState.error.value) return
+        await Promise.allSettled([characterState.refresh(projectId), refreshTags(projectId, token)])
     }
 
     async function refreshTags(projectId = projectState.selectedProjectId.value, token = loadToken) {
@@ -126,14 +27,14 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
             tags.value = []
             return
         }
+
         tagError.value = ''
         try {
             const result = await adapters.tags.list(projectId)
-            if (token !== loadToken || projectState.selectedProjectId.value !== projectId) return
+            if (!isCurrentProject(projectId, token)) return
             tags.value = result.tags
         } catch (reason) {
-            if (token === loadToken && projectState.selectedProjectId.value === projectId)
-                tagError.value = errorMessage(reason)
+            if (isCurrentProject(projectId, token)) tagError.value = errorMessage(reason)
             throw reason
         }
     }
@@ -143,11 +44,11 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         if (!projectId) return
         try {
             const tag = await adapters.tags.create(projectId, input)
-            if (projectState.selectedProjectId.value !== projectId) return
+            if (!isSelectedProject(projectId)) return
             await refreshTags(projectId)
             return tag
         } catch (reason) {
-            tagError.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) tagError.value = errorMessage(reason)
             throw reason
         }
     }
@@ -157,27 +58,21 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         if (!projectId) return
         try {
             const tag = await adapters.tags.rename(projectId, tagId, input)
-            if (projectState.selectedProjectId.value !== projectId) return
+            if (!isSelectedProject(projectId)) return
             await refreshTags(projectId)
             return tag
         } catch (reason) {
-            tagError.value = errorMessage(reason)
+            if (isSelectedProject(projectId)) tagError.value = errorMessage(reason)
             throw reason
         }
     }
 
-    async function restoreCharacter(characterId: string) {
-        const projectId = projectState.selectedProjectId.value
-        if (!projectId) return
-        try {
-            const restored = await adapters.characters.restore(projectId, characterId)
-            if (projectState.selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return restored
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
+    function isSelectedProject(projectId: string): boolean {
+        return projectState.selectedProjectId.value === projectId
+    }
+
+    function isCurrentProject(projectId: string, token: number): boolean {
+        return token === loadToken && isSelectedProject(projectId)
     }
 
     return {
@@ -185,28 +80,28 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         deletedProjects: projectState.deletedProjects,
         storageIssues: projectState.storageIssues,
         selectedProject: projectState.selectedProject,
-        characters,
-        deletedCharacters,
+        characters: characterState.characters,
+        deletedCharacters: characterState.deletedCharacters,
         tags,
         loading: projectState.loading,
-        charactersLoading,
+        charactersLoading: characterState.loading,
         projectError: projectState.error,
-        characterError,
+        characterError: characterState.error,
         tagError,
         load,
         refreshProjects: projectState.refresh,
-        createProject,
-        updateProject,
-        deleteProject,
-        restoreProject,
-        repairProject,
-        clearProjectError,
-        createCharacter,
-        updateCharacter,
-        deleteCharacter,
+        createProject: projectState.create,
+        updateProject: projectState.update,
+        deleteProject: projectState.remove,
+        restoreProject: projectState.restore,
+        repairProject: projectState.repair,
+        clearProjectError: projectState.clearError,
+        createCharacter: characterState.create,
+        updateCharacter: characterState.update,
+        deleteCharacter: characterState.remove,
         createTag,
         renameTag,
-        restoreCharacter
+        restoreCharacter: characterState.restore
     }
 }
 
