@@ -165,6 +165,18 @@ describe('project API', () => {
         await expect(listing.json()).resolves.toMatchObject({ projects: [{ name: '雾港编年' }] })
     })
 
+    it('keeps validation failures in the documented JSON error response shape', async () => {
+        const response = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '   ', description: '' })
+        })
+
+        expect(response.status).toBe(400)
+        expect(response.headers.get('content-type')).toContain('application/json')
+        await expect(response.json()).resolves.toEqual({ error: '请填写项目名称。' })
+    })
+
     // Given a project with a character
     // When the user deletes and restores each record through the local API
     // Then normal and deleted listings reflect each independent state
