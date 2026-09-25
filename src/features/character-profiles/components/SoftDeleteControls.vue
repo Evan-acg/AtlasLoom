@@ -1,20 +1,19 @@
 <script setup lang="ts">
-    import { computed, ref } from 'vue'
+    import { computed } from 'vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
-    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
     const props = defineProps<{
         deletedProjects: Project[]
         selectedProject: Project | null
         deletedCharacters: Character[]
         selectedCharacterId: string | null
-        restoreProject: (projectId: string) => Promise<Project>
-        restoreCharacter: (characterId: string) => Promise<Character | undefined>
-        openProject: (project: Project) => void
     }>()
-
-    const error = ref('')
+    const emit = defineEmits<{
+        'restore-project': [projectId: string]
+        'restore-character': [characterId: string]
+        'open-project': [project: Project]
+    }>()
     const showDeletedCharacters = computed(
         () =>
             Boolean(props.selectedProject) &&
@@ -23,23 +22,13 @@
             props.deletedCharacters.length > 0
     )
 
-    async function restoreProjectRecord(project: Project) {
-        error.value = ''
-        try {
-            await props.restoreProject(project.id)
-        } catch (reason) {
-            error.value = getCharacterProfilesErrorMessage(reason)
-        }
+    function restoreProjectRecord(project: Project) {
+        emit('restore-project', project.id)
     }
 
-    async function restoreCharacterRecord(character: Character) {
+    function restoreCharacterRecord(character: Character) {
         if (!props.selectedProject) return
-        error.value = ''
-        try {
-            await props.restoreCharacter(character.id)
-        } catch (reason) {
-            error.value = getCharacterProfilesErrorMessage(reason)
-        }
+        emit('restore-character', character.id)
     }
 </script>
 
@@ -67,7 +56,7 @@
                         class="min-h-11 rounded-md px-3 text-sm font-medium text-ink-secondary hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         :aria-label="`打开 ${project.name}`"
-                        @click="openProject(project)"
+                        @click="emit('open-project', project)"
                     >
                         打开
                     </button>
@@ -110,13 +99,5 @@
                 </button>
             </div>
         </section>
-
-        <p
-            v-if="error"
-            class="pointer-events-auto rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-            role="alert"
-        >
-            {{ error }}
-        </p>
     </div>
 </template>

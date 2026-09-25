@@ -106,10 +106,6 @@
         if (route.query.character === undefined) return
         void router.push({ query: { ...route.query, character: undefined } })
     }
-
-    function restoreProjectRecord(projectId: string) {
-        return workspace.restoreProject(projectId)
-    }
 </script>
 
 <template>
@@ -118,9 +114,9 @@
         :selected-project="workspace.selectedProject.value"
         :deleted-characters="workspace.deletedCharacters.value"
         :selected-character-id="selectedCharacterId"
-        :restore-project="restoreProjectRecord"
-        :restore-character="workspace.restoreCharacter"
-        :open-project="openProject"
+        @restore-project="workspace.restoreProject"
+        @restore-character="workspace.restoreCharacter"
+        @open-project="openProject"
     />
     <ArchivedProjectView
         v-if="isArchivedProject"
@@ -129,9 +125,9 @@
         :deleted-characters="workspace.deletedCharacters.value"
         :loading="workspace.loading.value || workspace.charactersLoading.value"
         :error="workspace.projectError.value || workspace.characterError.value"
-        :restore-project="restoreProjectRecord"
-        :restore-character="workspace.restoreCharacter"
         :show-project-list="showProjectList"
+        @restore-project="workspace.restoreProject"
+        @restore-character="workspace.restoreCharacter"
     />
     <ProjectWorkspaceContent
         v-else

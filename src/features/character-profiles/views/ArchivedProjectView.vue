@@ -1,8 +1,7 @@
 <script setup lang="ts">
-    import { computed, ref } from 'vue'
+    import { computed } from 'vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
-    import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
     const props = defineProps<{
         project: Project | null
@@ -10,34 +9,24 @@
         deletedCharacters: Character[]
         loading: boolean
         error: string
-        restoreProject: (projectId: string) => Promise<Project>
-        restoreCharacter: (characterId: string) => Promise<Character | undefined>
         showProjectList: () => void
     }>()
-
-    const actionError = ref('')
+    const emit = defineEmits<{
+        'restore-project': [projectId: string]
+        'restore-character': [characterId: string]
+    }>()
     const sortedCharacters = computed(() =>
         [...props.characters, ...props.deletedCharacters].sort((a, b) => a.name.localeCompare(b.name))
     )
 
-    async function restoreArchivedProject() {
+    function restoreArchivedProject() {
         if (!props.project) return
-        actionError.value = ''
-        try {
-            await props.restoreProject(props.project.id)
-        } catch (reason) {
-            actionError.value = getCharacterProfilesErrorMessage(reason)
-        }
+        emit('restore-project', props.project.id)
     }
 
-    async function restoreArchivedCharacter(character: Character) {
+    function restoreArchivedCharacter(character: Character) {
         if (!props.project) return
-        actionError.value = ''
-        try {
-            await props.restoreCharacter(character.id)
-        } catch (reason) {
-            actionError.value = getCharacterProfilesErrorMessage(reason)
-        }
+        emit('restore-character', character.id)
     }
 </script>
 
@@ -138,14 +127,6 @@
                     </p>
                 </div>
             </section>
-
-            <p
-                v-if="actionError"
-                class="mt-4 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-                role="alert"
-            >
-                {{ actionError }}
-            </p>
         </div>
     </main>
 </template>
