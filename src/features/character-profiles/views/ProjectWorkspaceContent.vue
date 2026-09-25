@@ -29,6 +29,8 @@
     const characterPageError = props.characterState.error
     const tags = props.characterState.tags
     const tagError = props.characterState.tagError
+    const tagsLoading = props.characterState.tagsLoading
+    const tagsSaving = props.characterState.tagsSaving
 
     const projectDialogMode = ref<'create' | 'edit' | null>(null)
     const projectSaving = ref(false)
@@ -142,6 +144,8 @@
                         :loading="charactersLoading"
                         :error="characterPageError"
                         :tags="tags"
+                        :tags-loading="tagsLoading"
+                        :tags-saving="tagsSaving"
                         :create-character="props.characterState.create"
                         :update-character="props.characterState.update"
                         :delete-character="props.characterState.remove"
@@ -155,6 +159,8 @@
                         v-if="!props.selectedCharacterId"
                         :tags="tags"
                         :error="tagError"
+                        :loading="tagsLoading"
+                        :saving="tagsSaving"
                         :rename-tag="props.characterState.renameTag"
                     />
                 </ProjectDetail>

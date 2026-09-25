@@ -17,6 +17,8 @@
         error: string
         tags: Tag[]
         tagError: string
+        tagsLoading: boolean
+        tagsSaving: boolean
         createCharacter: (input: CharacterInput) => Promise<Character | undefined>
         updateCharacter: (characterId: string, input: CharacterInput) => Promise<Character | undefined>
         deleteCharacter: (characterId: string) => Promise<Character | undefined>
@@ -134,6 +136,8 @@
         :saving="saving"
         :error="formError"
         :tag-error="tagError"
+        :tags-loading="tagsLoading"
+        :tags-saving="tagsSaving"
         :create-tag="props.createTag"
         @submit="saveCharacter"
         @close="closeForm"

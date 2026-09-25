@@ -32,6 +32,8 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         projectError: projectState.error,
         characterError: characterState.error,
         tagError: tagState.tagError,
+        tagsLoading: tagState.loading,
+        tagsSaving: tagState.saving,
         load,
         refreshProjects: projectState.refresh,
         createProject: projectState.create,

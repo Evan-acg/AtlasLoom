@@ -11,6 +11,8 @@
         saving: boolean
         error: string
         tagError: string
+        tagsLoading: boolean
+        tagsSaving: boolean
         createTag: (input: TagInput) => Promise<Tag | undefined>
     }>()
 
@@ -30,6 +32,7 @@
     const displayError = computed(() => props.error || validationError.value)
 
     function submit() {
+        if (props.saving || props.tagsSaving) return
         const name = draft.value.name.trim()
         if (!name) {
             validationError.value = '请填写角色姓名。'
@@ -125,6 +128,8 @@
                 <CharacterTagField
                     :model-value="draft.tagIds ?? []"
                     :tags="tags"
+                    :loading="tagsLoading"
+                    :saving="saving || tagsSaving"
                     :error="tagError"
                     :create-tag="createTag"
                     @update:model-value="updateTagIds"
@@ -257,9 +262,11 @@
                     <button
                         class="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active active:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
                         type="submit"
-                        :disabled="saving"
+                        :disabled="saving || tagsSaving"
                     >
-                        {{ saving ? '保存中…' : mode === 'edit' ? '保存角色' : '创建角色' }}
+                        {{
+                            saving ? '保存中…' : tagsSaving ? '标签保存中…' : mode === 'edit' ? '保存角色' : '创建角色'
+                        }}
                     </button>
                 </div>
             </form>
