@@ -105,7 +105,7 @@
             </p>
         </template>
         <p
-            v-else-if="loading"
+            v-if="loading"
             class="mt-7 text-center text-sm text-ink-muted"
             role="status"
         >
