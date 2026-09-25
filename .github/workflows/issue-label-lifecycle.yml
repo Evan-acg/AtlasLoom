@@ -1,0 +1,26 @@
+name: Clean closed issue triage labels
+
+on:
+    issues:
+        types:
+            - closed
+
+permissions:
+    issues: write
+
+jobs:
+    remove-queue-labels:
+        name: Remove queue labels
+        runs-on: ubuntu-latest
+        steps:
+            - name: Remove labels that represent pending work
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+                  ISSUE_NUMBER: ${{ github.event.issue.number }}
+              run: |
+                  for label in needs-triage needs-info ready-for-agent ready-for-human; do
+                    gh issue edit "$ISSUE_NUMBER" \
+                      --repo "$GITHUB_REPOSITORY" \
+                      --remove-label "$label"
+                  done
