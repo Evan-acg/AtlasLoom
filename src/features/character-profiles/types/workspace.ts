@@ -65,3 +65,9 @@ export interface CharacterJourneyState {
     createTag: (input: TagInput) => Promise<Tag | undefined>
     renameTag: (id: string, input: TagInput) => Promise<Tag | undefined>
 }
+
+export type CharacterSaveState =
+    | { status: 'idle' }
+    | { status: 'saving' }
+    | { status: 'error'; message: string }
+    | { status: 'success'; character: Character }

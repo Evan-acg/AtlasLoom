@@ -951,7 +951,7 @@
         >
             <form
                 v-if="dialog === 'project'"
-                class="w-full max-w-lg rounded-2xl border border-hairline bg-white p-6 shadow-xl sm:p-8"
+                class="w-full max-w-lg rounded-2xl border border-hairline bg-white p-6 shadow-lg sm:p-8"
                 aria-labelledby="project-dialog-title"
                 @submit.prevent="saveProject"
             >
@@ -1011,7 +1011,7 @@
             </form>
             <form
                 v-else
-                class="w-full max-w-lg rounded-2xl border border-hairline bg-white p-6 shadow-xl sm:p-8"
+                class="w-full max-w-lg rounded-2xl border border-hairline bg-white p-6 shadow-lg sm:p-8"
                 aria-labelledby="character-dialog-title"
                 @submit.prevent="saveCharacter"
             >

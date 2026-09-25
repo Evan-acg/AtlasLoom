@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { ref } from 'vue'
+    import { ref, watch } from 'vue'
     import BackupManager from '../components/BackupManager.vue'
     import CharacterJourney from '../components/CharacterJourney.vue'
     import ProjectDetail from '../components/ProjectDetail.vue'
@@ -7,7 +7,8 @@
     import ProjectList from '../components/ProjectList.vue'
     import ProjectTagManager from '../components/ProjectTagManager.vue'
     import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
-    import type { CharacterJourneyState, ProjectJourneyState } from '../types/workspace'
+    import type { CharacterInput } from '../types/character'
+    import type { CharacterJourneyState, CharacterSaveState, ProjectJourneyState } from '../types/workspace'
     import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
     const props = defineProps<{
@@ -42,6 +43,12 @@
     const tagError = props.characterState.tagError
     const tagsLoading = props.characterState.tagsLoading
     const tagsSaving = props.characterState.tagsSaving
+    const characterSaveState = ref<CharacterSaveState>({ status: 'idle' })
+    let characterSaveRequest = 0
+    watch(selectedProject, () => {
+        characterSaveRequest += 1
+        characterSaveState.value = { status: 'idle' }
+    })
 
     const projectDialogMode = ref<'create' | 'edit' | null>(null)
     const projectSaving = ref(false)
@@ -133,6 +140,46 @@
         if (!confirmed) return
         await repairStorageIssue(issue, 'restore-backup')
     }
+
+    async function saveCharacter(characterId: string | undefined, input: CharacterInput) {
+        const requestId = ++characterSaveRequest
+        characterSaveState.value = { status: 'saving' }
+        try {
+            const character = characterId
+                ? await props.characterState.update(characterId, input)
+                : await props.characterState.create(input)
+            if (requestId !== characterSaveRequest) return
+            if (!character) {
+                characterSaveState.value = { status: 'error', message: '当前没有可用的项目。' }
+                return
+            }
+            characterSaveState.value = { status: 'success', character }
+        } catch (reason) {
+            if (requestId !== characterSaveRequest) return
+            characterSaveState.value = { status: 'error', message: getCharacterProfilesErrorMessage(reason) }
+        }
+    }
+
+    function resetCharacterSaveState() {
+        characterSaveRequest += 1
+        characterSaveState.value = { status: 'idle' }
+    }
+
+    async function deleteCharacter(characterId: string) {
+        try {
+            await props.characterState.remove(characterId)
+        } catch {
+            return
+        }
+    }
+
+    async function restoreCharacter(characterId: string) {
+        try {
+            await props.characterState.restore(characterId)
+        } catch {
+            return
+        }
+    }
 </script>
 
 <template>
@@ -158,14 +205,15 @@
                         :tags="tags"
                         :tags-loading="tagsLoading"
                         :tags-saving="tagsSaving"
-                        :create-character="props.characterState.create"
-                        :update-character="props.characterState.update"
-                        :delete-character="props.characterState.remove"
-                        :restore-character="props.characterState.restore"
+                        :save-state="characterSaveState"
                         :create-tag="props.characterState.createTag"
                         :tag-error="tagError"
                         @select-character="props.openCharacter"
                         @show-list="props.showCharacterList"
+                        @save-character="saveCharacter"
+                        @reset-save-state="resetCharacterSaveState"
+                        @delete-character="deleteCharacter"
+                        @restore-character="restoreCharacter"
                     />
                     <ProjectTagManager
                         v-if="!props.selectedCharacterId"
