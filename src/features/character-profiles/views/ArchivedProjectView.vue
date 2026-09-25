@@ -103,7 +103,10 @@
                     :entries="project.history"
                 />
 
-                <div class="px-5 py-7 sm:px-7 sm:py-9">
+                <div
+                    v-if="!project.deletedAt"
+                    class="px-5 py-7 sm:px-7 sm:py-9"
+                >
                     <h2 class="text-lg font-semibold">归档角色</h2>
                     <p class="mt-2 text-sm text-ink-muted">恢复项目后，未单独删除的角色会重新出现在正常列表中。</p>
                     <div

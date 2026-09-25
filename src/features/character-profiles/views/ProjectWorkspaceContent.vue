@@ -35,6 +35,7 @@
     const selectedProject = props.projectState.selectedProject
     const characters = props.characterState.characters
     const deletedCharacters = props.characterState.deletedCharacters
+    const characterIssues = props.characterState.characterIssues
     const charactersLoading = props.characterState.charactersLoading
     const characterPageError = props.characterState.error
     const tags = props.characterState.tags
@@ -150,6 +151,7 @@
                         :project="selectedProject"
                         :characters="characters"
                         :deleted-characters="deletedCharacters"
+                        :character-issues="characterIssues"
                         :selected-character-id="props.selectedCharacterId"
                         :loading="charactersLoading"
                         :error="characterPageError"

@@ -55,6 +55,23 @@ describe('ProjectBackupRepository', () => {
         })
     })
 
+    // Given a valid backup and no existing data directory
+    // When the user replaces the local dataset with that backup
+    // Then the data directory is initialized and the backup becomes available
+    it('initializes a missing data directory during replace import', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '首次导入项目', description: '' })
+        const backup = await new ProjectBackupRepository(new ProjectFileStorage(dataDirectory)).exportBackup()
+        await rm(dataDirectory, { recursive: true, force: true })
+
+        await new ProjectBackupRepository(new ProjectFileStorage(dataDirectory)).applyImport(backup, 'replace', {})
+
+        await expect(new ProjectRepository(dataDirectory).listProjects()).resolves.toMatchObject({
+            projects: [expect.objectContaining({ id: project.id, name: '首次导入项目' })],
+            deletedProjects: []
+        })
+    })
+
     it('round-trips projects, characters, tags, deletion state, and history', async () => {
         const repository = new ProjectRepository(dataDirectory)
         const project = await repository.createProject({ name: '雾港编年', description: '' })

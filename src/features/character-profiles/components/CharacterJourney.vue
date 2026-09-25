@@ -3,7 +3,7 @@
     import CharacterDetail from './CharacterDetail.vue'
     import CharacterForm from './CharacterForm.vue'
     import CharacterList from './CharacterList.vue'
-    import type { Character, CharacterInput } from '../types/character'
+    import type { Character, CharacterInput, CharacterStorageIssue } from '../types/character'
     import type { Project } from '../types/project'
     import type { Tag, TagInput } from '../types/tag'
     import { getCharacterProfilesErrorMessage } from '../utils/error-message'
@@ -12,6 +12,7 @@
         project: Project
         characters: Character[]
         deletedCharacters: Character[]
+        characterIssues: CharacterStorageIssue[]
         selectedCharacterId: string | null
         loading: boolean
         error: string
@@ -123,6 +124,7 @@
         :tags="tags"
         :loading="loading"
         :error="dialogMode ? '' : error"
+        :storage-issues="characterIssues"
         @create="openCreateCharacter"
         @select="(characterId) => emit('selectCharacter', characterId)"
     />

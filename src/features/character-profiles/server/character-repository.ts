@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Character, CharacterInput, CharacterListResult } from '../types/character.ts'
-import { ProjectFileStorage, ProjectStorageError } from './project-file-storage.ts'
+import { ProjectFileStorage, ProjectStorageError, type CharacterReadResult } from './project-file-storage.ts'
 import { ProjectJsonCodecError } from './project-json-codec.ts'
 import { ProjectRepositoryError } from './project-repository-error.ts'
 import type { ProjectLookup } from './repository-context.ts'
@@ -15,10 +15,11 @@ export class CharacterRepository {
 
     async listCharacters(projectId: string): Promise<CharacterListResult> {
         const located = await this.projects.findProject(projectId)
-        const characters = await this.readCharacters(located.directoryName, located.project.id)
+        const result = await this.readCharacters(located.directoryName, located.project.id)
         return {
-            characters: characters.filter((character) => !character.deletedAt),
-            deletedCharacters: characters.filter((character) => character.deletedAt)
+            characters: result.characters.filter((character) => !character.deletedAt),
+            deletedCharacters: result.characters.filter((character) => character.deletedAt),
+            ...(result.issues.length ? { issues: result.issues } : {})
         }
     }
 
@@ -43,7 +44,7 @@ export class CharacterRepository {
 
     async updateCharacter(projectId: string, characterId: string, input: CharacterInput): Promise<Character> {
         const located = await this.projects.findProject(projectId)
-        const characters = await this.readCharacters(located.directoryName, located.project.id)
+        const characters = (await this.readCharacters(located.directoryName, located.project.id)).characters
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         const normalized = normalizeCharacterInput(input)
@@ -63,7 +64,7 @@ export class CharacterRepository {
 
     async deleteCharacter(projectId: string, characterId: string): Promise<Character> {
         const located = await this.projects.findProject(projectId)
-        const characters = await this.readCharacters(located.directoryName, located.project.id)
+        const characters = (await this.readCharacters(located.directoryName, located.project.id)).characters
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         if (current.deletedAt) return current
@@ -80,7 +81,7 @@ export class CharacterRepository {
 
     async restoreCharacter(projectId: string, characterId: string): Promise<Character> {
         const located = await this.projects.findProject(projectId)
-        const characters = await this.readCharacters(located.directoryName, located.project.id)
+        const characters = (await this.readCharacters(located.directoryName, located.project.id)).characters
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         if (!current.deletedAt) return current
@@ -95,9 +96,9 @@ export class CharacterRepository {
         return restored
     }
 
-    private async readCharacters(directoryName: string, projectId: string): Promise<Character[]> {
+    private async readCharacters(directoryName: string, projectId: string): Promise<CharacterReadResult> {
         try {
-            return await this.storage.readCharacters(directoryName, projectId)
+            return await this.storage.readCharactersWithIssues(directoryName, projectId)
         } catch (error) {
             if (error instanceof ProjectJsonCodecError) {
                 if (error.code === 'invalid-json') {
@@ -118,7 +119,7 @@ export class CharacterRepository {
         name: string,
         excludingId?: string
     ): Promise<void> {
-        const duplicate = (await this.readCharacters(directoryName, projectId)).find(
+        const duplicate = (await this.readCharacters(directoryName, projectId)).characters.find(
             (character) => character.id !== excludingId && characterNameKey(character.name) === characterNameKey(name)
         )
         if (duplicate) throw new ProjectRepositoryError(`角色姓名“${name}”已存在，请换一个姓名。`, 'duplicate-name')

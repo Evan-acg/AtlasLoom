@@ -13,6 +13,7 @@
         'restore-project': [projectId: string]
         'restore-character': [characterId: string]
         'open-project': [project: Project]
+        'open-character': [characterId: string]
     }>()
     const showDeletedCharacters = computed(
         () =>
@@ -89,14 +90,24 @@
                 class="flex items-center justify-between gap-3 rounded-md bg-white/70 px-3 py-2"
             >
                 <span class="truncate text-sm font-medium">{{ character.name }}</span>
-                <button
-                    class="min-h-11 rounded-md px-3 text-sm font-semibold text-primary hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    type="button"
-                    :aria-label="`恢复 ${character.name}`"
-                    @click="restoreCharacterRecord(character)"
-                >
-                    恢复
-                </button>
+                <div class="flex shrink-0 gap-1">
+                    <button
+                        class="min-h-11 rounded-md px-3 text-sm font-semibold text-primary hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        type="button"
+                        :aria-label="`打开 ${character.name}`"
+                        @click="emit('open-character', character.id)"
+                    >
+                        打开
+                    </button>
+                    <button
+                        class="min-h-11 rounded-md px-3 text-sm font-semibold text-primary hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        type="button"
+                        :aria-label="`恢复 ${character.name}`"
+                        @click="restoreCharacterRecord(character)"
+                    >
+                        恢复
+                    </button>
+                </div>
             </div>
         </section>
     </div>

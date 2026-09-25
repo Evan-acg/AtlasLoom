@@ -176,6 +176,43 @@ describe('ProjectRepository', () => {
         await expect(new ProjectRepository(dataDirectory).listTags(project.id)).resolves.toEqual({ tags: [validTag] })
     })
 
+    // Given a project with valid and damaged character files
+    // When the user loads its characters
+    // Then the damaged character is isolated and valid characters remain available
+    it('isolates damaged character files while listing characters', async () => {
+        const repository = new ProjectRepository(dataDirectory)
+        const project = await repository.createProject({ name: '雾港编年', description: '' })
+        const validCharacter = await repository.createCharacter(project.id, {
+            name: '沈潮生',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+        const damagedCharacter = await repository.createCharacter(project.id, {
+            name: '待修复',
+            aliases: [],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        })
+        await writeFile(join(dataDirectory, '雾港编年', 'profile', `${damagedCharacter.id}.json`), '{invalid json')
+
+        await expect(new ProjectRepository(dataDirectory).listCharacters(project.id)).resolves.toEqual({
+            characters: [validCharacter],
+            deletedCharacters: [],
+            issues: [{ fileName: `${damagedCharacter.id}.json`, reason: 'invalid-json' }]
+        })
+    })
+
     // Given a persisted project
     // When the user changes its name and description
     // Then the project directory and metadata move together and the edit survives a new repository instance

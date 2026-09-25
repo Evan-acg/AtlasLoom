@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, join, resolve } from 'node:path'
-import type { Character } from '../types/character.ts'
+import type { Character, CharacterStorageIssue } from '../types/character.ts'
 import type { BackupArchive, ProjectBackupBundle } from '../types/backup.ts'
 import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
@@ -11,6 +11,11 @@ const metadataFileName = 'metadata.json'
 const backupFileName = 'metadata.json.bak'
 const profileDirectoryName = 'profile'
 const tagsDirectoryName = 'tags'
+
+export interface CharacterReadResult {
+    characters: Character[]
+    issues: CharacterStorageIssue[]
+}
 
 export class ProjectStorageError extends Error {
     constructor(
@@ -102,38 +107,43 @@ export class ProjectFileStorage {
     }
 
     async readCharacters(directoryName: string, projectId: string): Promise<Character[]> {
+        return (await this.readCharactersFromDirectory(directoryName, projectId, false)).characters
+    }
+
+    async readCharactersWithIssues(directoryName: string, projectId: string): Promise<CharacterReadResult> {
         return this.readCharactersFromDirectory(directoryName, projectId, false)
     }
 
     async readCharactersStrict(directoryName: string, projectId: string): Promise<Character[]> {
-        return this.readCharactersFromDirectory(directoryName, projectId, true)
+        return (await this.readCharactersFromDirectory(directoryName, projectId, true)).characters
     }
 
     private async readCharactersFromDirectory(
         directoryName: string,
         projectId: string,
         strict: boolean
-    ): Promise<Character[]> {
+    ): Promise<CharacterReadResult> {
         const profilePath = join(this.dataDirectory, directoryName, profileDirectoryName)
         let entries
         try {
             entries = await this.fileSystem.readdir(profilePath, { withFileTypes: true })
         } catch (error) {
-            if (isFileMissingError(error)) return []
+            if (isFileMissingError(error)) return { characters: [], issues: [] }
             throw error
         }
 
         const characters: Character[] = []
+        const issues: CharacterStorageIssue[] = []
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
             } catch (error) {
                 if (strict) throw new ProjectStorageError('invalid-record', `角色文件“${entry.name}”无效。`)
-                if (error instanceof ProjectJsonCodecError) throw error
-                throw new ProjectStorageError('invalid-record', 'Character file is unreadable.')
+                issues.push(characterFileIssue(entry.name, error))
+                continue
             }
         }
-        return characters.sort((a, b) => a.name.localeCompare(b.name))
+        return { characters: characters.sort((a, b) => a.name.localeCompare(b.name)), issues }
     }
 
     async writeCharacter(directoryName: string, character: Character): Promise<void> {
@@ -194,6 +204,10 @@ export class ProjectFileStorage {
 
         try {
             await this.writeDataset(stagingDirectory, bundles)
+            if (!(await this.directoryExists(this.dataDirectory))) {
+                await this.fileSystem.rename(stagingDirectory, this.dataDirectory)
+                return
+            }
             await this.fileSystem.rename(this.dataDirectory, previousDirectory)
             try {
                 await this.fileSystem.rename(stagingDirectory, this.dataDirectory)
@@ -203,6 +217,16 @@ export class ProjectFileStorage {
             }
         } finally {
             await this.fileSystem.rm(stagingDirectory, { recursive: true, force: true })
+        }
+    }
+
+    private async directoryExists(directory: string): Promise<boolean> {
+        try {
+            await this.fileSystem.stat(directory)
+            return true
+        } catch (error) {
+            if (isFileMissingError(error)) return false
+            throw error
         }
     }
 
@@ -363,4 +387,16 @@ function isFileExistsError(error: unknown): boolean {
 
 function isFileMissingError(error: unknown): boolean {
     return isRecord(error) && error.code === 'ENOENT'
+}
+
+function characterFileIssue(fileName: string, error: unknown): CharacterStorageIssue {
+    const reason: CharacterStorageIssue['reason'] =
+        error instanceof ProjectJsonCodecError
+            ? error.code === 'invalid-json'
+                ? 'invalid-json'
+                : error.code === 'unsupported-version'
+                  ? 'unsupported-version'
+                  : 'invalid-fields'
+            : 'unreadable'
+    return { fileName, reason }
 }

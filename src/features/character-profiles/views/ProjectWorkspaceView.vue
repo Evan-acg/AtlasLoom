@@ -63,6 +63,7 @@
     const characterJourney: CharacterJourneyState = {
         characters: workspace.characters,
         deletedCharacters: workspace.deletedCharacters,
+        characterIssues: workspace.characterIssues,
         charactersLoading: workspace.charactersLoading,
         error: workspace.characterError,
         tags: workspace.tags,
@@ -120,6 +121,7 @@
         @restore-project="workspace.restoreProject"
         @restore-character="workspace.restoreCharacter"
         @open-project="openProject"
+        @open-character="openCharacter"
     />
     <ArchivedProjectView
         v-if="isArchivedProject"

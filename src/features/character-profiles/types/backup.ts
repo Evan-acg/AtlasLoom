@@ -1,6 +1,6 @@
-import type { Character } from './character'
-import type { Project } from './project'
-import type { Tag } from './tag'
+import type { Character } from './character.ts'
+import type { Project } from './project.ts'
+import type { Tag } from './tag.ts'
 
 export const backupFormatVersion = 1
 
