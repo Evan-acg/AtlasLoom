@@ -22,6 +22,7 @@
     import SoftDeleteControls from '../components/SoftDeleteControls.vue'
     import { useProjectWorkspace } from '../composables/useProjectWorkspace'
     import type { Project } from '../types/project'
+    import type { CharacterJourneyState, ProjectJourneyState } from '../types/workspace'
 
     const route = useRoute()
     const router = useRouter()
@@ -43,6 +44,36 @@
         },
         tags: { list: listTags, create: createTag, rename: renameTag }
     })
+    const projectJourney: ProjectJourneyState = {
+        projects: workspace.projects,
+        deletedProjects: workspace.deletedProjects,
+        storageIssues: workspace.storageIssues,
+        selectedProject: workspace.selectedProject,
+        loading: workspace.loading,
+        error: workspace.projectError,
+        load: workspace.load,
+        refresh: workspace.refreshProjects,
+        create: workspace.createProject,
+        update: workspace.updateProject,
+        remove: workspace.deleteProject,
+        restore: workspace.restoreProject,
+        repair: workspace.repairProject,
+        clearError: workspace.clearProjectError
+    }
+    const characterJourney: CharacterJourneyState = {
+        characters: workspace.characters,
+        deletedCharacters: workspace.deletedCharacters,
+        charactersLoading: workspace.charactersLoading,
+        error: workspace.characterError,
+        tags: workspace.tags,
+        tagError: workspace.tagError,
+        create: workspace.createCharacter,
+        update: workspace.updateCharacter,
+        remove: workspace.deleteCharacter,
+        restore: workspace.restoreCharacter,
+        createTag: workspace.createTag,
+        renameTag: workspace.renameTag
+    }
     const selectedProjectId = computed(() => (typeof route.query.project === 'string' ? route.query.project : null))
     const isArchivedProject = computed(() => {
         return Boolean(
@@ -78,7 +109,8 @@
     <ArchivedProjectView v-if="isArchivedProject" />
     <ProjectWorkspaceContent
         v-else
-        :workspace="workspace"
+        :project-state="projectJourney"
+        :character-state="characterJourney"
         :open-project="openProject"
         :show-project-list="showProjectList"
     />
