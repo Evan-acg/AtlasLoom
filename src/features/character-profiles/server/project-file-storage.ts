@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, join, resolve } from 'node:path'
-import type { Character } from '../types/character.ts'
+import type { Character, CharacterStorageIssue } from '../types/character.ts'
 import type { BackupArchive, ProjectBackupBundle } from '../types/backup.ts'
 import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
@@ -14,7 +14,7 @@ const tagsDirectoryName = 'tags'
 
 export interface CharacterReadResult {
     characters: Character[]
-    issues: string[]
+    issues: CharacterStorageIssue[]
 }
 
 export class ProjectStorageError extends Error {
@@ -133,7 +133,7 @@ export class ProjectFileStorage {
         }
 
         const characters: Character[] = []
-        const issues: string[] = []
+        const issues: CharacterStorageIssue[] = []
         for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
             try {
                 characters.push(await this.decodeCharacter(join(profilePath, entry.name), projectId))
@@ -389,14 +389,14 @@ function isFileMissingError(error: unknown): boolean {
     return isRecord(error) && error.code === 'ENOENT'
 }
 
-function characterFileIssue(fileName: string, error: unknown): string {
-    const reason =
+function characterFileIssue(fileName: string, error: unknown): CharacterStorageIssue {
+    const reason: CharacterStorageIssue['reason'] =
         error instanceof ProjectJsonCodecError
             ? error.code === 'invalid-json'
-                ? '无法解析为有效 JSON'
+                ? 'invalid-json'
                 : error.code === 'unsupported-version'
-                  ? '使用了不受支持的格式版本'
-                  : '缺少必需字段或字段格式错误'
-            : '无法读取'
-    return `角色文件“${fileName}”${reason}，已跳过。`
+                  ? 'unsupported-version'
+                  : 'invalid-fields'
+            : 'unreadable'
+    return { fileName, reason }
 }

@@ -209,7 +209,7 @@ describe('ProjectRepository', () => {
         await expect(new ProjectRepository(dataDirectory).listCharacters(project.id)).resolves.toEqual({
             characters: [validCharacter],
             deletedCharacters: [],
-            issues: [`角色文件“${damagedCharacter.id}.json”无法解析为有效 JSON，已跳过。`]
+            issues: [{ fileName: `${damagedCharacter.id}.json`, reason: 'invalid-json' }]
         })
     })
 

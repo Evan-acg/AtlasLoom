@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import type { Character, CharacterInput, CharacterListResult } from './character'
+import type { Character, CharacterInput, CharacterListResult, CharacterStorageIssue } from './character'
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from './project'
 import type { Tag, TagInput, TagListResult } from './tag'
 
@@ -51,7 +51,7 @@ export interface ProjectJourneyState {
 export interface CharacterJourneyState {
     characters: Ref<Character[]>
     deletedCharacters: Ref<Character[]>
-    characterIssues: Ref<string[]>
+    characterIssues: Ref<CharacterStorageIssue[]>
     charactersLoading: Ref<boolean>
     error: Ref<string>
     tags: Ref<Tag[]>

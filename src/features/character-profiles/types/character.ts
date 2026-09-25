@@ -2,6 +2,13 @@ import type { HistoryEntry } from './history'
 
 export type CharacterHistoryEntry = HistoryEntry
 
+export type CharacterStorageIssueReason = 'invalid-json' | 'unsupported-version' | 'invalid-fields' | 'unreadable'
+
+export interface CharacterStorageIssue {
+    fileName: string
+    reason: CharacterStorageIssueReason
+}
+
 export interface Character {
     id: string
     projectId: string
@@ -28,5 +35,5 @@ export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 
 export interface CharacterListResult {
     characters: Character[]
     deletedCharacters: Character[]
-    issues?: string[]
+    issues?: CharacterStorageIssue[]
 }

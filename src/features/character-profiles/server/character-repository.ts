@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Character, CharacterInput, CharacterListResult } from '../types/character.ts'
-import { ProjectFileStorage, ProjectStorageError } from './project-file-storage.ts'
+import { ProjectFileStorage, ProjectStorageError, type CharacterReadResult } from './project-file-storage.ts'
 import { ProjectJsonCodecError } from './project-json-codec.ts'
 import { ProjectRepositoryError } from './project-repository-error.ts'
 import type { ProjectLookup } from './repository-context.ts'
@@ -96,10 +96,7 @@ export class CharacterRepository {
         return restored
     }
 
-    private async readCharacters(
-        directoryName: string,
-        projectId: string
-    ): Promise<{ characters: Character[]; issues: string[] }> {
+    private async readCharacters(directoryName: string, projectId: string): Promise<CharacterReadResult> {
         try {
             return await this.storage.readCharactersWithIssues(directoryName, projectId)
         } catch (error) {

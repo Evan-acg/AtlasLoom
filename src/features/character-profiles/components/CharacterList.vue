@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { computed, ref } from 'vue'
     import TagFilterControls from './TagFilterControls.vue'
-    import type { Character } from '../types/character'
+    import type { Character, CharacterStorageIssue } from '../types/character'
     import type { Tag } from '../types/tag'
 
     const props = defineProps<{
@@ -9,7 +9,7 @@
         tags: Tag[]
         loading: boolean
         error: string
-        storageIssues: string[]
+        storageIssues: CharacterStorageIssue[]
     }>()
 
     const emit = defineEmits<{
@@ -32,6 +32,16 @@
             return matchesSearch && matchesTags
         })
     })
+
+    function storageIssueMessage(issue: CharacterStorageIssue): string {
+        const reason = {
+            'invalid-json': '无法解析为有效 JSON',
+            'unsupported-version': '使用了不受支持的格式版本',
+            'invalid-fields': '缺少必需字段或字段格式错误',
+            unreadable: '无法读取'
+        }[issue.reason]
+        return `角色文件“${issue.fileName}”${reason}，已跳过。`
+    }
 
     function characterTagNames(character: Character): string[] {
         return character.tagIds.map((tagId) => props.tags.find((tag) => tag.id === tagId)?.name ?? '标签不可用')
@@ -101,7 +111,7 @@
                 class="mt-5 rounded-md bg-state-warning-surface px-3 py-2 text-sm text-ink-secondary"
                 role="status"
             >
-                部分角色档案无法读取：{{ storageIssues.join(' ') }}
+                部分角色档案无法读取：{{ storageIssues.map(storageIssueMessage).join(' ') }}
             </p>
         </template>
         <p

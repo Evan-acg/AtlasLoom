@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import type { Character, CharacterInput } from '../types/character'
+import type { Character, CharacterInput, CharacterStorageIssue } from '../types/character'
 import type { ProjectWorkspaceCharacterAdapter } from '../types/workspace'
 import { getCharacterProfilesErrorMessage } from '../utils/error-message'
 
@@ -9,7 +9,7 @@ export function useCharacterWorkspace(
 ) {
     const characters = ref<Character[]>([])
     const deletedCharacters = ref<Character[]>([])
-    const issues = ref<string[]>([])
+    const issues = ref<CharacterStorageIssue[]>([])
     const loading = ref(false)
     const error = ref('')
     let requestToken = 0
