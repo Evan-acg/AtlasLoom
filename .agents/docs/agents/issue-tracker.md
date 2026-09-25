@@ -15,6 +15,14 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Issue lifecycle
+
+- **Ready**: an open issue with complete acceptance criteria, no open blockers, no assignee, and the `ready-for-agent` label.
+- **Claim**: assign the issue first, then remove `ready-for-agent`; the assignee and open state represent work in progress.
+- **Blocked**: remove `ready-for-agent` and record the blocker with a native dependency or the appropriate triage label.
+- **Resolve**: merge the PR, add a completion comment with verification evidence, close the issue, then verify that pending-work labels are absent. The `wontfix` label may remain as an outcome label.
+- **Automation**: `.github/workflows/issue-label-lifecycle.yml` removes pending-work triage labels whenever an issue is closed. Manual close flows must still verify the final state with `gh issue view <number> --json state,labels`.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
