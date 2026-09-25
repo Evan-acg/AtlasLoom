@@ -29,13 +29,15 @@
 远端工作分支由 GitHub 在 PR 合并后自动删除。本地工作分支不会被远程自动删除，开发者必须在 PR 合并后切回基准分支并删除本地工作分支：
 
 ```bash
+gh pr view <pr-number> --json state,mergedAt,headRefOid
 git fetch origin --prune
 git switch <base-branch>
 git pull --ff-only
-git branch -d <work-branch>
+git rev-parse <work-branch>
+git branch -D <work-branch>
 ```
 
-其中 `<base-branch>` 是本次 PR 的目标分支，`<work-branch>` 是已合并的本地工作分支。若本地分支仍有未合并提交，必须先确认是否需要保留，不得使用 `-D` 强制删除。
+其中 `<pr-number>` 是本次 PR 编号；只有输出的 `state` 为 `MERGED`，且 `headRefOid` 与 `git rev-parse <work-branch>` 输出的 SHA 完全一致时才继续清理。`<base-branch>` 是本次 PR 的目标分支，`<work-branch>` 是已合并的本地工作分支。仓库使用 Squash merge，工作分支提交通常不会成为目标分支的祖先，因此必须先完成上述核对，再使用 `-D` 删除。PR 未合并或本地工作分支 SHA 不一致时，禁止删除该分支。
 
 ## Issue 与 PR
 

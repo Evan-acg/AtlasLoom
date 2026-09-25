@@ -37,8 +37,12 @@ Closes #
 合并完成后执行：
 
 ```bash
+gh pr view <pr-number> --json state,mergedAt,headRefOid
 git fetch origin --prune
 git switch <base-branch>
 git pull --ff-only
-git branch -d <work-branch>
+git rev-parse <work-branch>
+git branch -D <work-branch>
 ```
+
+仅当 `state` 为 `MERGED`，且 `headRefOid` 与 `git rev-parse <work-branch>` 输出的 SHA 完全一致时执行最后一条命令。
