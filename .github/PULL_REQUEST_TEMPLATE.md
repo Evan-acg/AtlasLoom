@@ -37,8 +37,11 @@ Closes #
 合并完成后执行：
 
 ```bash
+gh pr view <pr-number> --json state,mergedAt
 git fetch origin --prune
 git switch <base-branch>
 git pull --ff-only
 git branch -D <work-branch>
 ```
+
+仅当输出的 `state` 为 `MERGED`，且没有需要保留的本地独有提交时执行最后一条命令。
