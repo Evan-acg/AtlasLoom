@@ -66,6 +66,8 @@
         error: workspace.characterError,
         tags: workspace.tags,
         tagError: workspace.tagError,
+        tagsLoading: workspace.tagsLoading,
+        tagsSaving: workspace.tagsSaving,
         create: workspace.createCharacter,
         update: workspace.updateCharacter,
         remove: workspace.deleteCharacter,

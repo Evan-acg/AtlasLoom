@@ -55,6 +55,8 @@ export interface CharacterJourneyState {
     error: Ref<string>
     tags: Ref<Tag[]>
     tagError: Ref<string>
+    tagsLoading: Ref<boolean>
+    tagsSaving: ComputedRef<boolean>
     create: (input: CharacterInput) => Promise<Character | undefined>
     update: (id: string, input: CharacterInput) => Promise<Character | undefined>
     remove: (id: string) => Promise<Character | undefined>

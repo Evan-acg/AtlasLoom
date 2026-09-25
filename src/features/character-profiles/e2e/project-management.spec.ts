@@ -397,6 +397,49 @@ test('maintains project tags and filters the character list', async ({ page, pro
     await expect(page.getByText('核心')).toBeVisible()
 })
 
+// Given a character form with a tag creation request still in flight
+// When the user tries to save the character
+// Then character saving stays disabled until the tag has been persisted
+test('waits for a pending tag mutation before allowing character save', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+
+    let characterCreateCount = 0
+    await page.route('**/api/projects/*/characters', async (route) => {
+        if (route.request().method() === 'POST') characterCreateCount += 1
+        await route.continue()
+    })
+    let releaseTagResponse!: () => void
+    const tagResponse = new Promise<void>((resolve) => {
+        releaseTagResponse = resolve
+    })
+    await page.route('**/api/projects/*/tags', async (route) => {
+        if (route.request().method() !== 'POST') {
+            await route.continue()
+            return
+        }
+
+        const response = await route.fetch()
+        await tagResponse
+        await route.fulfill({ response })
+    })
+
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await page.getByLabel('角色姓名').fill('沈潮生')
+    await page.getByLabel('新建标签').fill('领航员')
+    const pendingTag = page.getByRole('button', { name: '新建标签' }).click()
+    const saveCharacter = page.locator('form').getByRole('button', { name: /创建角色|标签保存中/ })
+
+    await expect(saveCharacter).toBeDisabled()
+    await page.getByLabel('角色姓名').press('Enter')
+    expect(characterCreateCount).toBe(0)
+    await expect(page.getByRole('heading', { name: '新建角色' })).toBeVisible()
+    releaseTagResponse()
+    await pendingTag
+    await expect(page.getByRole('button', { name: '创建角色' })).toBeEnabled()
+})
+
 async function startApp(): Promise<{ server: ViteDevServer; url: string }> {
     const server = await createServer({
         configFile: resolve(cwd(), 'vite.config.ts'),

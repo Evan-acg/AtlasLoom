@@ -6,6 +6,8 @@
         tags: Tag[]
         modelValue: string[]
         error: string
+        loading: boolean
+        saving: boolean
         createTag: (input: TagInput) => Promise<Tag | undefined>
     }>()
     const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
@@ -34,10 +36,20 @@
 </script>
 
 <template>
-    <fieldset class="rounded-lg border border-hairline p-4">
+    <fieldset
+        class="rounded-lg border border-hairline p-4"
+        :aria-busy="loading || saving"
+    >
         <legend class="px-1 text-sm font-medium">角色标签</legend>
         <div
-            v-if="sortedTags.length"
+            v-if="loading"
+            class="mt-2 text-sm text-ink-muted"
+            role="status"
+        >
+            正在读取项目标签…
+        </div>
+        <div
+            v-else-if="sortedTags.length"
             class="mt-1 flex flex-wrap gap-x-4 gap-y-2"
         >
             <label
@@ -47,6 +59,7 @@
             >
                 <input
                     :checked="modelValue.includes(tag.id)"
+                    :disabled="saving"
                     type="checkbox"
                     :aria-label="`角色标签：${tag.name}`"
                     :value="tag.id"
@@ -67,15 +80,17 @@
                 v-model="newTagName"
                 class="min-h-10 min-w-0 flex-1 rounded border border-hairline bg-white px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 aria-label="新建标签"
+                :disabled="loading || saving"
                 maxlength="80"
                 placeholder="输入标签名称"
             />
             <button
                 class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                :disabled="loading || saving"
                 type="button"
                 @click="createTagFromInput"
             >
-                新建标签
+                {{ saving ? '保存中…' : '新建标签' }}
             </button>
         </div>
         <p

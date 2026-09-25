@@ -5,6 +5,8 @@
     const props = defineProps<{
         tags: Tag[]
         error: string
+        loading: boolean
+        saving: boolean
         renameTag: (tagId: string, input: TagInput) => Promise<Tag | undefined>
     }>()
     const editingTagId = ref('')
@@ -45,6 +47,7 @@
 <template>
     <section
         class="mt-6 rounded-lg border border-hairline p-4"
+        :aria-busy="loading || saving"
         aria-labelledby="project-tags-title"
     >
         <h3
@@ -54,7 +57,14 @@
             项目标签
         </h3>
         <div
-            v-if="sortedTags.length"
+            v-if="loading"
+            class="mt-2 text-sm text-ink-muted"
+            role="status"
+        >
+            正在读取项目标签…
+        </div>
+        <div
+            v-else-if="sortedTags.length"
             class="mt-3 space-y-2"
         >
             <div
@@ -66,6 +76,7 @@
                 <button
                     class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     type="button"
+                    :disabled="saving"
                     :aria-label="`重命名标签：${tag.name}`"
                     @click="startRename(tag)"
                 >
@@ -76,17 +87,20 @@
                         v-model="editingTagName"
                         class="min-h-9 rounded border border-hairline bg-white px-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                         aria-label="标签名称"
+                        :disabled="saving"
                         maxlength="80"
                     />
                     <button
                         class="min-h-9 rounded-full bg-primary px-3 text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        :disabled="saving"
                         type="button"
                         @click="saveRename"
                     >
-                        保存标签
+                        {{ saving ? '保存中…' : '保存标签' }}
                     </button>
                     <button
                         class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        :disabled="saving"
                         type="button"
                         @click="cancelRename"
                     >
