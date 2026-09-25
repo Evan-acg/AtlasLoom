@@ -10,6 +10,8 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
+- **Multi-line comment bodies (PowerShell)**: do not put `\n` inside a quoted string; it is sent as literal text. Build the body with a single-quoted here-string (or join lines with `[Environment]::NewLine`) and pass the variable to `--comment`/`--body`.
+- **Update an existing comment**: use `gh api --method PATCH repos/<owner>/<repo>/issues/comments/<comment-id> --field body="$body"`; after writing, verify the rendered text with `gh api ... --jq .body`.
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
