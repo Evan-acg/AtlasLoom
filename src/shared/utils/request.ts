@@ -12,11 +12,6 @@ export const apiClient = axios.create({
 export async function request<T>(config: AxiosRequestConfig, fallbackMessage: string): Promise<T> {
     try {
         const response = await apiClient.request<T>(config)
-
-        if ((config.method ?? 'GET').toUpperCase() !== 'GET') {
-            globalThis.dispatchEvent(new Event('atlasloom:data-changed'))
-        }
-
         return response.data
     } catch (error: unknown) {
         if (axios.isAxiosError<ErrorResponse>(error)) {

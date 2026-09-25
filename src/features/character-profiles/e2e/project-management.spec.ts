@@ -236,6 +236,21 @@ test('creates and persists a complete character profile', async ({ page, project
     await expect(page.getByText('不要让他轻易相信陌生人。')).toBeVisible()
 })
 
+// Given a character form with only whitespace as its name
+// When the user submits the form
+// Then the draft stays local and the form reports the boundary error
+test('keeps the character form open for a blank name', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await page.getByLabel('角色姓名').fill('   ')
+    await page.getByRole('button', { name: '创建角色' }).click()
+
+    await expect(page.getByRole('dialog', { name: '新建角色' })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('请填写角色姓名')
+})
+
 // Given a project with a character
 // When the user edits its profile or reuses its name
 // Then the changes persist and duplicate names are rejected only within that project
@@ -325,7 +340,12 @@ test('maintains project tags and filters the character list', async ({ page, pro
     await expect(page.getByRole('button', { name: '打开 林砚舟' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '打开 白栖迟' })).toHaveCount(0)
 
-    await page.getByLabel('筛选标签：航海').uncheck()
+    await page.getByRole('button', { name: '清除筛选' }).click()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 林砚舟' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开 白栖迟' })).toBeVisible()
+
+    await page.getByLabel('筛选标签：主角').check()
     await page.getByRole('button', { name: '重命名标签：主角' }).click()
     await page.getByLabel('标签名称').fill('核心')
     await page.getByRole('button', { name: '保存标签' }).click()

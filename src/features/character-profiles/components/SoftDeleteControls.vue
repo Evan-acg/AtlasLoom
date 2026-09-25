@@ -1,68 +1,34 @@
 <script setup lang="ts">
-    import { computed, onMounted, ref, watch } from 'vue'
-    import { useRoute, useRouter } from 'vue-router'
-    import { listCharacters, restoreCharacter } from '../api/characters'
-    import { listProjects, restoreProject } from '../api/projects'
+    import { computed } from 'vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
 
-    const route = useRoute()
-    const router = useRouter()
-    const projects = ref<Project[]>([])
-    const deletedProjects = ref<Project[]>([])
-    const deletedCharacters = ref<Character[]>([])
-    const error = ref('')
-
-    const selectedProject = computed(() => {
-        const projectId = route.query.project
-        if (typeof projectId !== 'string') return null
-        return [...projects.value, ...deletedProjects.value].find((project) => project.id === projectId) ?? null
-    })
-    onMounted(() => void load())
-    watch(
-        () => `${route.query.project ?? ''}:${route.query.character ?? ''}`,
-        () => void load()
+    const props = defineProps<{
+        deletedProjects: Project[]
+        selectedProject: Project | null
+        deletedCharacters: Character[]
+        selectedCharacterId: string | null
+    }>()
+    const emit = defineEmits<{
+        'restore-project': [projectId: string]
+        'restore-character': [characterId: string]
+        'open-project': [project: Project]
+    }>()
+    const showDeletedCharacters = computed(
+        () =>
+            Boolean(props.selectedProject) &&
+            !props.selectedProject?.deletedAt &&
+            props.selectedCharacterId === null &&
+            props.deletedCharacters.length > 0
     )
 
-    async function load() {
-        error.value = ''
-        try {
-            const result = await listProjects()
-            projects.value = result.projects
-            deletedProjects.value = result.deletedProjects
-            if (typeof route.query.project !== 'string') {
-                deletedCharacters.value = []
-                return
-            }
-            const characterResult = await listCharacters(route.query.project)
-            deletedCharacters.value = characterResult.deletedCharacters
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        }
+    function restoreProjectRecord(project: Project) {
+        emit('restore-project', project.id)
     }
 
-    async function restoreProjectRecord(project = selectedProject.value) {
-        if (!project) return
-        try {
-            await restoreProject(project.id)
-            globalThis.location.reload()
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        }
-    }
-
-    async function restoreCharacterRecord(character: Character) {
-        if (!selectedProject.value) return
-        try {
-            await restoreCharacter(selectedProject.value.id, character.id)
-            globalThis.location.reload()
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        }
-    }
-
-    function openProject(project: Project) {
-        void router.push({ query: { project: project.id, character: undefined } })
+    function restoreCharacterRecord(character: Character) {
+        if (!props.selectedProject) return
+        emit('restore-character', character.id)
     }
 </script>
 
@@ -90,7 +56,7 @@
                         class="min-h-11 rounded-md px-3 text-sm font-medium text-ink-secondary hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         type="button"
                         :aria-label="`打开 ${project.name}`"
-                        @click="openProject(project)"
+                        @click="emit('open-project', project)"
                     >
                         打开
                     </button>
@@ -107,12 +73,7 @@
         </section>
 
         <section
-            v-if="
-                selectedProject &&
-                !selectedProject.deletedAt &&
-                route.query.character === undefined &&
-                deletedCharacters.length
-            "
+            v-if="showDeletedCharacters"
             class="pointer-events-auto flex w-full max-w-[1200px] flex-col gap-3 rounded-lg border border-state-warning-border bg-state-warning-surface px-4 py-3 shadow-sm"
             aria-labelledby="deleted-characters-title"
         >
@@ -138,13 +99,5 @@
                 </button>
             </div>
         </section>
-
-        <p
-            v-if="error"
-            class="pointer-events-auto rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
-            role="alert"
-        >
-            {{ error }}
-        </p>
     </div>
 </template>

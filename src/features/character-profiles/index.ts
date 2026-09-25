@@ -1,2 +1,1 @@
-export { default as ProjectWorkspaceView } from './views/ProjectWorkspaceView.vue'
-export { default as WorkspacePrototype } from './prototypes/WorkspaceFlowPrototype.vue'
+export { default as CharacterProfilesView } from './views/CharacterProfilesEntryView.vue'

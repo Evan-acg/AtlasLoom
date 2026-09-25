@@ -144,6 +144,67 @@ describe('project API', () => {
         })
     })
 
+    // Given a tag belongs to another project
+    // When the user creates or updates a character with that tag ID
+    // Then the API rejects the cross-project reference as a client error
+    it('rejects cross-project character tag references', async () => {
+        const firstProjectResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年' })
+        })
+        const firstProject = (await firstProjectResponse.json()) as { project: { id: string } }
+        const secondProjectResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '星垂边境' })
+        })
+        const secondProject = (await secondProjectResponse.json()) as { project: { id: string } }
+        const tagResponse = await fetch(`${baseUrl}/projects/${secondProject.project.id}/tags`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '异乡' })
+        })
+        const tag = (await tagResponse.json()) as { tag: { id: string } }
+        const input = {
+            name: '沈潮生',
+            aliases: [],
+            tagIds: [tag.tag.id],
+            introduction: '',
+            appearance: '',
+            personality: '',
+            backstory: '',
+            motivation: '',
+            abilities: '',
+            notes: ''
+        }
+
+        const createResponse = await fetch(`${baseUrl}/projects/${firstProject.project.id}/characters`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(input)
+        })
+        const validCharacterResponse = await fetch(`${baseUrl}/projects/${firstProject.project.id}/characters`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ...input, name: '陆照夜', tagIds: [] })
+        })
+        const validCharacter = (await validCharacterResponse.json()) as { character: { id: string } }
+        const updateResponse = await fetch(
+            `${baseUrl}/projects/${firstProject.project.id}/characters/${validCharacter.character.id}`,
+            {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(input)
+            }
+        )
+
+        expect(createResponse.status).toBe(400)
+        await expect(createResponse.json()).resolves.toEqual({ error: '角色标签必须属于当前项目。' })
+        expect(updateResponse.status).toBe(400)
+        await expect(updateResponse.json()).resolves.toEqual({ error: '角色标签必须属于当前项目。' })
+    })
+
     // Given a project has already been created
     // When the user submits another project with the same name
     // Then the API rejects it with a conflict and keeps the existing project
@@ -163,6 +224,18 @@ describe('project API', () => {
         await expect(duplicate.json()).resolves.toMatchObject({ error: expect.stringContaining('已存在') })
         const listing = await fetch(`${baseUrl}/projects`)
         await expect(listing.json()).resolves.toMatchObject({ projects: [{ name: '雾港编年' }] })
+    })
+
+    it('keeps validation failures in the documented JSON error response shape', async () => {
+        const response = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '   ', description: '' })
+        })
+
+        expect(response.status).toBe(400)
+        expect(response.headers.get('content-type')).toContain('application/json')
+        await expect(response.json()).resolves.toEqual({ error: '请填写项目名称。' })
     })
 
     // Given a project with a character

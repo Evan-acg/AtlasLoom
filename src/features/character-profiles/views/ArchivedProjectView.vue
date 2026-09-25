@@ -1,65 +1,32 @@
 <script setup lang="ts">
-    import { computed, onMounted, ref, watch } from 'vue'
-    import { useRoute, useRouter } from 'vue-router'
-    import { listCharacters, restoreCharacter } from '../api/characters'
-    import { listProjects, restoreProject } from '../api/projects'
+    import { computed } from 'vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
 
-    const route = useRoute()
-    const router = useRouter()
-    const project = ref<Project | null>(null)
-    const characters = ref<Character[]>([])
-    const loading = ref(true)
-    const error = ref('')
-
-    const sortedCharacters = computed(() => [...characters.value].sort((a, b) => a.name.localeCompare(b.name)))
-
-    onMounted(() => void load())
-    watch(
-        () => route.query.project,
-        () => void load()
+    const props = defineProps<{
+        project: Project | null
+        characters: Character[]
+        deletedCharacters: Character[]
+        loading: boolean
+        error: string
+        showProjectList: () => void
+    }>()
+    const emit = defineEmits<{
+        'restore-project': [projectId: string]
+        'restore-character': [characterId: string]
+    }>()
+    const sortedCharacters = computed(() =>
+        [...props.characters, ...props.deletedCharacters].sort((a, b) => a.name.localeCompare(b.name))
     )
 
-    async function load() {
-        const projectId = route.query.project
-        if (typeof projectId !== 'string') return
-        loading.value = true
-        error.value = ''
-        try {
-            const projects = await listProjects()
-            project.value = projects.deletedProjects.find((item) => item.id === projectId) ?? null
-            const result = await listCharacters(projectId)
-            characters.value = [...result.characters, ...result.deletedCharacters]
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        } finally {
-            loading.value = false
-        }
+    function restoreArchivedProject() {
+        if (!props.project) return
+        emit('restore-project', props.project.id)
     }
 
-    async function restoreArchivedProject() {
-        if (!project.value) return
-        try {
-            await restoreProject(project.value.id)
-            globalThis.location.reload()
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        }
-    }
-
-    async function restoreArchivedCharacter(character: Character) {
-        if (!project.value) return
-        try {
-            await restoreCharacter(project.value.id, character.id)
-            await load()
-        } catch (reason) {
-            error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
-        }
-    }
-
-    function showProjectList() {
-        void router.push({ query: { project: undefined, character: undefined } })
+    function restoreArchivedCharacter(character: Character) {
+        if (!props.project) return
+        emit('restore-character', character.id)
     }
 </script>
 
@@ -78,6 +45,7 @@
             <p
                 v-if="loading"
                 class="rounded-xl border border-hairline bg-surface px-5 py-8 text-center text-sm text-ink-muted"
+                role="status"
             >
                 正在读取归档项目…
             </p>

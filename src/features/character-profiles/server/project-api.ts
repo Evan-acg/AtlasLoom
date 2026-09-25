@@ -4,6 +4,8 @@ import type { ProjectInput, ProjectRepairResolution } from '../types/project.ts'
 import type { TagInput } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 import { ProjectRepository, ProjectRepositoryError } from './project-repository.ts'
+import type { ProjectRepositoryFactory, ProjectRepositoryPort } from './project-repository-port.ts'
+import { getCharacterProfilesErrorMessage } from '../utils/error-message.ts'
 
 const maximumRequestBytes = 64 * 1024
 
@@ -16,14 +18,20 @@ class ApiError extends Error {
     }
 }
 
-export function createProjectApiMiddleware(dataDirectory: string) {
-    const repository = new ProjectRepository(dataDirectory)
+export function createProjectApiMiddleware(
+    dataDirectory: string,
+    createRepository: ProjectRepositoryFactory = (directory) => new ProjectRepository(directory)
+) {
+    const repository = createRepository(dataDirectory)
 
     return (request: IncomingMessage, response: ServerResponse) => {
         void handleRequest(request, response, repository).catch((error: unknown) => {
             if (response.writableEnded) return
             const status = getErrorStatus(error)
-            const message = status === 500 ? '本地项目服务暂时无法处理请求。' : errorMessage(error)
+            const message =
+                status === 500
+                    ? '本地项目服务暂时无法处理请求。'
+                    : getCharacterProfilesErrorMessage(error, '请求无法完成。')
             sendJson(response, status, { error: message })
         })
     }
@@ -32,7 +40,7 @@ export function createProjectApiMiddleware(dataDirectory: string) {
 async function handleRequest(
     request: IncomingMessage,
     response: ServerResponse,
-    repository: ProjectRepository
+    repository: ProjectRepositoryPort
 ): Promise<void> {
     response.setHeader('Cache-Control', 'no-store')
     if (!isLoopbackAddress(request.socket.remoteAddress)) {
@@ -295,15 +303,13 @@ function getErrorStatus(error: unknown): number {
                 return 409
             case 'not-found':
                 return 404
+            case 'invalid-tag-reference':
+                return 400
             case 'invalid-data':
                 return 422
         }
     }
     return 500
-}
-
-function errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : '请求无法完成。'
 }
 
 function isProjectRepairResolution(value: unknown): value is ProjectRepairResolution {
