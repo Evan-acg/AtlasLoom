@@ -1,23 +1,20 @@
 import { computed, ref } from 'vue'
-import type { Character, CharacterInput } from '../types/character'
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from '../types/project'
 import type { Tag, TagInput } from '../types/tag'
 import type { ProjectWorkspaceAdapters } from '../types/workspace'
+import { useCharacterWorkspace } from './useCharacterWorkspace'
 
 export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     const projects = ref<Project[]>([])
     const deletedProjects = ref<Project[]>([])
     const storageIssues = ref<ProjectListResult['issues']>([])
-    const characters = ref<Character[]>([])
-    const deletedCharacters = ref<Character[]>([])
     const tags = ref<Tag[]>([])
     const selectedProjectId = ref<string | null>(null)
     const loading = ref(false)
-    const charactersLoading = ref(false)
     const projectError = ref('')
-    const characterError = ref('')
     const tagError = ref('')
     let loadToken = 0
+    const characterWorkspace = useCharacterWorkspace(adapters.characters, selectedProjectId)
 
     const selectedProject = computed(
         () =>
@@ -28,20 +25,17 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     async function load(projectId: string | null = null) {
         const token = ++loadToken
         selectedProjectId.value = projectId
-        characters.value = []
-        deletedCharacters.value = []
+        characterWorkspace.reset()
         tags.value = []
         loading.value = true
-        charactersLoading.value = false
         projectError.value = ''
-        characterError.value = ''
         tagError.value = ''
         try {
             await refreshProjects(token)
         } catch {
             return
         } finally {
-            loading.value = false
+            if (token === loadToken) loading.value = false
         }
 
         if (!projectId) {
@@ -49,7 +43,7 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         }
 
         if (token !== loadToken) return
-        await Promise.allSettled([refreshCharacters(projectId, token), refreshTags(projectId, token)])
+        await Promise.allSettled([characterWorkspace.refresh(projectId), refreshTags(projectId, token)])
     }
 
     async function refreshProjects(token = loadToken) {
@@ -124,70 +118,6 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         projectError.value = ''
     }
 
-    async function refreshCharacters(projectId = selectedProjectId.value, token = loadToken) {
-        if (!projectId) {
-            characters.value = []
-            deletedCharacters.value = []
-            return
-        }
-        charactersLoading.value = true
-        characterError.value = ''
-        try {
-            const result = await adapters.characters.list(projectId)
-            if (token !== loadToken || selectedProjectId.value !== projectId) return
-            characters.value = result.characters
-            deletedCharacters.value = result.deletedCharacters
-        } catch (reason) {
-            if (token === loadToken && selectedProjectId.value === projectId)
-                characterError.value = errorMessage(reason)
-            throw reason
-        } finally {
-            if (token === loadToken) charactersLoading.value = false
-        }
-    }
-
-    async function createCharacter(input: CharacterInput) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.create(projectId, input)
-            if (selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function updateCharacter(characterId: string, input: CharacterInput) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.update(projectId, characterId, input)
-            if (selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
-    async function deleteCharacter(characterId: string) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const character = await adapters.characters.remove(projectId, characterId)
-            if (selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return character
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
     async function refreshTags(projectId = selectedProjectId.value, token = loadToken) {
         if (!projectId) {
             tags.value = []
@@ -232,32 +162,18 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         }
     }
 
-    async function restoreCharacter(characterId: string) {
-        const projectId = selectedProjectId.value
-        if (!projectId) return
-        try {
-            const restored = await adapters.characters.restore(projectId, characterId)
-            if (selectedProjectId.value !== projectId) return
-            await refreshCharacters(projectId)
-            return restored
-        } catch (reason) {
-            characterError.value = errorMessage(reason)
-            throw reason
-        }
-    }
-
     return {
         projects,
         deletedProjects,
         storageIssues,
         selectedProject,
-        characters,
-        deletedCharacters,
+        characters: characterWorkspace.characters,
+        deletedCharacters: characterWorkspace.deletedCharacters,
         tags,
         loading,
-        charactersLoading,
+        charactersLoading: characterWorkspace.loading,
         projectError,
-        characterError,
+        characterError: characterWorkspace.error,
         tagError,
         load,
         createProject,
@@ -266,12 +182,12 @@ export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
         restoreProject,
         repairProject,
         clearProjectError,
-        createCharacter,
-        updateCharacter,
-        deleteCharacter,
+        createCharacter: characterWorkspace.create,
+        updateCharacter: characterWorkspace.update,
+        deleteCharacter: characterWorkspace.remove,
         createTag,
         renameTag,
-        restoreCharacter
+        restoreCharacter: characterWorkspace.restore
     }
 }
 

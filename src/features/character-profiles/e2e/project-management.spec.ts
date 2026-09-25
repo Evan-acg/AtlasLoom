@@ -236,6 +236,21 @@ test('creates and persists a complete character profile', async ({ page, project
     await expect(page.getByText('不要让他轻易相信陌生人。')).toBeVisible()
 })
 
+// Given a character form with only whitespace as its name
+// When the user submits the form
+// Then the draft stays local and the form reports the boundary error
+test('keeps the character form open for a blank name', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await page.getByRole('button', { name: '＋ 新建角色' }).click()
+    await page.getByLabel('角色姓名').fill('   ')
+    await page.getByRole('button', { name: '创建角色' }).click()
+
+    await expect(page.getByRole('dialog', { name: '新建角色' })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('请填写角色姓名')
+})
+
 // Given a project with a character
 // When the user edits its profile or reuses its name
 // Then the changes persist and duplicate names are rejected only within that project
