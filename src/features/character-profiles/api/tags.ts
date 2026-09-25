@@ -1,0 +1,27 @@
+import type { Tag, TagInput, TagListResult } from '../types/tag'
+import { request } from './request'
+
+export async function listTags(projectId: string): Promise<TagListResult> {
+    return request<TagListResult>(`/projects/${encodeURIComponent(projectId)}/tags`, {}, '请求本地标签服务失败。')
+}
+
+export async function createTag(projectId: string, input: TagInput): Promise<Tag> {
+    const result = await request<{ tag: Tag }>(
+        `/projects/${encodeURIComponent(projectId)}/tags`,
+        {
+            method: 'POST',
+            body: JSON.stringify(input)
+        },
+        '请求本地标签服务失败。'
+    )
+    return result.tag
+}
+
+export async function renameTag(projectId: string, tagId: string, input: TagInput): Promise<Tag> {
+    const result = await request<{ tag: Tag }>(
+        `/projects/${encodeURIComponent(projectId)}/tags/${encodeURIComponent(tagId)}`,
+        { method: 'PATCH', body: JSON.stringify(input) },
+        '请求本地标签服务失败。'
+    )
+    return result.tag
+}

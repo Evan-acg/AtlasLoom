@@ -3,8 +3,10 @@
     import { useRoute, useRouter } from 'vue-router'
     import { createCharacter, listCharacters, updateCharacter } from '../api/characters'
     import { createProject, listProjects, repairProject as repairProjectStorage, updateProject } from '../api/projects'
+    import { createTag, listTags, renameTag } from '../api/tags'
     import type { Character, CharacterInput } from '../types/character'
     import type { Project, ProjectInput, ProjectRepairResolution, ProjectStorageIssue } from '../types/project'
+    import type { Tag } from '../types/tag'
 
     const projects = ref<Project[]>([])
     const storageIssues = ref<ProjectStorageIssue[]>([])
@@ -17,6 +19,13 @@
     const charactersLoading = ref(false)
     const characterPageError = ref('')
     const selectedCharacter = ref<Character | null>(null)
+    const tags = ref<Tag[]>([])
+    const characterSearch = ref('')
+    const selectedTagIds = ref<string[]>([])
+    const tagError = ref('')
+    const newTagName = ref('')
+    const editingTagId = ref('')
+    const editingTagName = ref('')
     const dialogMode = ref<'create' | 'edit' | null>(null)
     const characterDialogMode = ref<'create' | 'edit' | null>(null)
     const projectName = ref('')
@@ -30,12 +39,26 @@
 
     const sortedProjects = computed(() => [...projects.value].sort((a, b) => a.name.localeCompare(b.name)))
     const dialogTitle = computed(() => (dialogMode.value === 'edit' ? '编辑项目' : '新建项目'))
+    const sortedTags = computed(() => [...tags.value].sort((a, b) => a.name.localeCompare(b.name)))
+    const filteredCharacters = computed(() => {
+        const search = characterSearch.value.trim().normalize('NFC').toLocaleLowerCase()
+        return characters.value.filter((character) => {
+            const matchesSearch =
+                !search ||
+                [character.name, ...character.aliases, character.introduction].some((value) =>
+                    value.normalize('NFC').toLocaleLowerCase().includes(search)
+                )
+            const matchesTags = selectedTagIds.value.every((tagId) => character.tagIds.includes(tagId))
+            return matchesSearch && matchesTags
+        })
+    })
 
     watch(
         () => route.query.project,
         async () => {
             syncSelectedProject()
-            await loadCharacters()
+            resetCharacterFilters()
+            await Promise.all([loadCharacters(), loadTags()])
         }
     )
     watch(() => route.query.character, syncSelectedCharacter)
@@ -49,7 +72,7 @@
             projects.value = result.projects
             storageIssues.value = result.issues
             syncSelectedProject()
-            await loadCharacters()
+            await Promise.all([loadCharacters(), loadTags()])
         } catch (error) {
             pageError.value = errorMessage(error)
         } finally {
@@ -156,6 +179,8 @@
         characterAliases.value = ''
         editingCharacterId.value = ''
         formError.value = ''
+        tagError.value = ''
+        newTagName.value = ''
     }
 
     function openEditCharacter(character: Character) {
@@ -163,6 +188,7 @@
         characterForm.value = {
             name: character.name,
             aliases: [...character.aliases],
+            tagIds: [...character.tagIds],
             introduction: character.introduction,
             appearance: character.appearance,
             personality: character.personality,
@@ -174,6 +200,8 @@
         characterAliases.value = character.aliases.join('\n')
         editingCharacterId.value = character.id
         formError.value = ''
+        tagError.value = ''
+        newTagName.value = ''
     }
 
     function closeCharacterDialog() {
@@ -219,6 +247,68 @@
         }
     }
 
+    async function loadTags() {
+        if (!selectedProject.value) {
+            tags.value = []
+            return
+        }
+        try {
+            const result = await listTags(selectedProject.value.id)
+            tags.value = result.tags
+        } catch (error) {
+            characterPageError.value = errorMessage(error)
+        }
+    }
+
+    async function createTagFromCharacter() {
+        if (!selectedProject.value) return
+        const name = newTagName.value.trim()
+        if (!name) {
+            tagError.value = '请填写标签名称。'
+            return
+        }
+
+        tagError.value = ''
+        try {
+            const tag = await createTag(selectedProject.value.id, { name })
+            tags.value = [...tags.value, tag]
+            characterForm.value.tagIds = [...new Set([...(characterForm.value.tagIds ?? []), tag.id])]
+            newTagName.value = ''
+        } catch (error) {
+            tagError.value = errorMessage(error)
+        }
+    }
+
+    function startRenameTag(tag: Tag) {
+        editingTagId.value = tag.id
+        editingTagName.value = tag.name
+        tagError.value = ''
+    }
+
+    function cancelRenameTag() {
+        editingTagId.value = ''
+        editingTagName.value = ''
+        tagError.value = ''
+    }
+
+    async function saveTagRename() {
+        if (!selectedProject.value) return
+        const name = editingTagName.value.trim()
+        if (!name) {
+            tagError.value = '请填写标签名称。'
+            return
+        }
+
+        tagError.value = ''
+        try {
+            const tag = await renameTag(selectedProject.value.id, editingTagId.value, { name })
+            tags.value = tags.value.map((item) => (item.id === tag.id ? tag : item))
+            cancelRenameTag()
+        } catch (error) {
+            tagError.value = errorMessage(error)
+        }
+    }
+
     async function loadCharacters() {
         if (!selectedProject.value) {
             characters.value = []
@@ -238,6 +328,11 @@
         }
     }
 
+    function resetCharacterFilters() {
+        characterSearch.value = ''
+        selectedTagIds.value = []
+    }
+
     function syncSelectedProject() {
         const projectId = route.query.project
         selectedProject.value =
@@ -252,6 +347,10 @@
                 : null
     }
 
+    function characterTagNames(character: Character): string[] {
+        return character.tagIds.map((tagId) => tags.value.find((tag) => tag.id === tagId)?.name ?? '标签不可用')
+    }
+
     function errorMessage(error: unknown): string {
         return error instanceof Error ? error.message : '本地项目服务暂时无法处理请求。'
     }
@@ -260,6 +359,7 @@
         return {
             name: '',
             aliases: [],
+            tagIds: [],
             introduction: '',
             appearance: '',
             personality: '',
@@ -312,6 +412,19 @@
                                 <dt class="text-xs font-semibold uppercase tracking-widest text-ink-muted">别名</dt>
                                 <dd class="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">
                                     {{ selectedCharacter.aliases.join('、') || '暂无别名。' }}
+                                </dd>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs font-semibold uppercase tracking-widest text-ink-muted">标签</dt>
+                                <dd class="mt-2 flex flex-wrap gap-2 text-sm text-ink-secondary">
+                                    <span
+                                        v-for="tagName in characterTagNames(selectedCharacter)"
+                                        :key="tagName"
+                                        class="rounded-full bg-canvas-soft px-2.5 py-1"
+                                    >
+                                        {{ tagName }}
+                                    </span>
+                                    <span v-if="!characterTagNames(selectedCharacter).length">暂无标签。</span>
                                 </dd>
                             </div>
                             <div class="sm:col-span-2">
@@ -399,7 +512,7 @@
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h2 class="text-lg font-semibold">角色档案</h2>
-                                    <p class="mt-2 text-sm text-ink-muted">{{ characters.length }} 个角色</p>
+                                    <p class="mt-2 text-sm text-ink-muted">{{ filteredCharacters.length }} 个角色</p>
                                 </div>
                                 <button
                                     class="min-h-11 shrink-0 rounded-full bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active active:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -409,6 +522,109 @@
                                     ＋ 新建角色
                                 </button>
                             </div>
+                            <div
+                                class="mt-6 grid gap-4 rounded-lg border border-hairline bg-canvas-soft p-4 sm:grid-cols-2"
+                            >
+                                <div>
+                                    <label
+                                        class="mb-2 block text-sm font-medium"
+                                        for="character-search"
+                                    >
+                                        搜索角色
+                                    </label>
+                                    <input
+                                        id="character-search"
+                                        v-model="characterSearch"
+                                        class="min-h-11 w-full rounded border border-hairline bg-white px-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                        type="search"
+                                        placeholder="姓名、别名或简介"
+                                    />
+                                </div>
+                                <fieldset v-if="sortedTags.length">
+                                    <legend class="mb-2 text-sm font-medium">按标签筛选</legend>
+                                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                        <label
+                                            v-for="tag in sortedTags"
+                                            :key="tag.id"
+                                            class="inline-flex min-h-8 items-center gap-2 text-sm text-ink-secondary"
+                                        >
+                                            <input
+                                                v-model="selectedTagIds"
+                                                type="checkbox"
+                                                :aria-label="`筛选标签：${tag.name}`"
+                                                :value="tag.id"
+                                            />
+                                            {{ tag.name }}
+                                        </label>
+                                    </div>
+                                </fieldset>
+                            </div>
+                            <section
+                                class="mt-6 rounded-lg border border-hairline p-4"
+                                aria-labelledby="project-tags-title"
+                            >
+                                <h3
+                                    id="project-tags-title"
+                                    class="text-sm font-semibold"
+                                >
+                                    项目标签
+                                </h3>
+                                <div
+                                    v-if="sortedTags.length"
+                                    class="mt-3 space-y-2"
+                                >
+                                    <div
+                                        v-for="tag in sortedTags"
+                                        :key="tag.id"
+                                        class="flex flex-wrap items-center gap-2 text-sm"
+                                    >
+                                        <span class="rounded-full bg-canvas-soft px-2.5 py-1">{{ tag.name }}</span>
+                                        <button
+                                            class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
+                                            type="button"
+                                            :aria-label="`重命名标签：${tag.name}`"
+                                            @click="startRenameTag(tag)"
+                                        >
+                                            重命名
+                                        </button>
+                                        <template v-if="editingTagId === tag.id">
+                                            <input
+                                                v-model="editingTagName"
+                                                class="min-h-9 rounded border border-hairline bg-white px-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                                aria-label="标签名称"
+                                                maxlength="80"
+                                            />
+                                            <button
+                                                class="min-h-9 rounded-full bg-primary px-3 text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                type="button"
+                                                @click="saveTagRename"
+                                            >
+                                                保存标签
+                                            </button>
+                                            <button
+                                                class="min-h-9 rounded-md px-2 text-ink-secondary hover:bg-canvas-soft"
+                                                type="button"
+                                                @click="cancelRenameTag"
+                                            >
+                                                取消
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <p
+                                    v-else
+                                    class="mt-2 text-sm text-ink-muted"
+                                >
+                                    还没有项目标签。
+                                </p>
+                                <p
+                                    v-if="tagError"
+                                    class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
+                                    role="alert"
+                                >
+                                    {{ tagError }}
+                                </p>
+                            </section>
                             <p
                                 v-if="characterPageError"
                                 class="mt-5 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
@@ -424,11 +640,11 @@
                                 正在读取角色档案…
                             </p>
                             <div
-                                v-else-if="characters.length"
+                                v-else-if="filteredCharacters.length"
                                 class="mt-6 divide-y divide-hairline border-y border-hairline"
                             >
                                 <div
-                                    v-for="character in characters"
+                                    v-for="character in filteredCharacters"
                                     :key="character.id"
                                     class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
                                 >
@@ -443,6 +659,18 @@
                                         <p class="mt-1 line-clamp-2 text-sm leading-5 text-ink-muted">
                                             {{ character.introduction || '暂无简介。' }}
                                         </p>
+                                        <div
+                                            v-if="characterTagNames(character).length"
+                                            class="mt-2 flex flex-wrap gap-1.5"
+                                        >
+                                            <span
+                                                v-for="tagName in characterTagNames(character)"
+                                                :key="tagName"
+                                                class="rounded-full bg-canvas-soft px-2 py-0.5 text-xs text-ink-secondary"
+                                            >
+                                                {{ tagName }}
+                                            </span>
+                                        </div>
                                     </div>
                                     <button
                                         class="min-h-11 shrink-0 self-start rounded-md px-3 text-sm font-medium text-ink-secondary hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:self-auto"
@@ -458,7 +686,11 @@
                                 v-else
                                 class="mt-7 border-y border-hairline py-8 text-center text-sm text-ink-muted"
                             >
-                                这个项目还没有角色档案。
+                                {{
+                                    characters.length
+                                        ? '没有符合当前搜索或筛选条件的角色。'
+                                        : '这个项目还没有角色档案。'
+                                }}
                             </p>
                         </div>
                     </section>
@@ -728,6 +960,50 @@
                             rows="2"
                         />
                     </div>
+                    <fieldset class="rounded-lg border border-hairline p-4">
+                        <legend class="px-1 text-sm font-medium">角色标签</legend>
+                        <div
+                            v-if="sortedTags.length"
+                            class="mt-1 flex flex-wrap gap-x-4 gap-y-2"
+                        >
+                            <label
+                                v-for="tag in sortedTags"
+                                :key="tag.id"
+                                class="inline-flex min-h-9 items-center gap-2 text-sm text-ink-secondary"
+                            >
+                                <input
+                                    v-model="characterForm.tagIds"
+                                    type="checkbox"
+                                    :aria-label="`角色标签：${tag.name}`"
+                                    :value="tag.id"
+                                />
+                                {{ tag.name }}
+                            </label>
+                        </div>
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <input
+                                v-model="newTagName"
+                                class="min-h-10 min-w-0 flex-1 rounded border border-hairline bg-white px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                aria-label="新建标签"
+                                maxlength="80"
+                                placeholder="输入标签名称"
+                            />
+                            <button
+                                class="min-h-10 rounded-md border border-hairline px-3 text-sm font-medium hover:bg-canvas-soft"
+                                type="button"
+                                @click="createTagFromCharacter"
+                            >
+                                新建标签
+                            </button>
+                        </div>
+                        <p
+                            v-if="tagError"
+                            class="mt-3 rounded-md bg-state-error-surface px-3 py-2 text-sm text-state-error"
+                            role="alert"
+                        >
+                            {{ tagError }}
+                        </p>
+                    </fieldset>
                     <div>
                         <label
                             class="mb-2 block text-sm font-medium"

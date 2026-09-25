@@ -12,12 +12,14 @@ import type {
     ProjectInput
 } from '../types/project.ts'
 import type { Character, CharacterInput } from '../types/character.ts'
+import type { Tag, TagInput, TagListResult } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 
 const formatVersion = 1
 const metadataFileName = 'metadata.json'
 const backupFileName = 'metadata.json.bak'
 const profileDirectoryName = 'profile'
+const tagsDirectoryName = 'tags'
 const invalidDirectoryCharacters = /[<>:"/\\|?*]/u
 const reservedWindowsNames = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/iu
 
@@ -26,6 +28,10 @@ interface ProjectMetadata extends Project {
 }
 
 interface CharacterMetadata extends Character {
+    formatVersion: number
+}
+
+interface TagMetadata extends Tag {
     formatVersion: number
 }
 
@@ -139,6 +145,43 @@ export class ProjectRepository {
         })
     }
 
+    listTags(projectId: string): Promise<TagListResult> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            return { tags: await this.readTags(located) }
+        })
+    }
+
+    createTag(projectId: string, input: TagInput): Promise<Tag> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const normalized = normalizeTagInput(input)
+            await this.assertTagNameAvailable(located, normalized.name)
+
+            const now = new Date().toISOString()
+            const tag: Tag = { id: randomUUID(), projectId, ...normalized, createdAt: now, updatedAt: now }
+            await this.writeTag(located, tag)
+            return tag
+        })
+    }
+
+    renameTag(projectId: string, tagId: string, input: TagInput): Promise<Tag> {
+        return this.enqueueOperation(async () => {
+            const located = await this.findProject(projectId)
+            const tags = await this.readTags(located)
+            const current = tags.find((tag) => tag.id === tagId)
+            if (!current) throw new ProjectRepositoryError('找不到该标签。', 'not-found')
+
+            const normalized = normalizeTagInput(input)
+            await this.assertTagNameAvailable(located, normalized.name, tagId)
+            if (current.name === normalized.name) return current
+
+            const updated: Tag = { ...current, ...normalized, updatedAt: new Date().toISOString() }
+            await this.writeTag(located, updated, true)
+            return updated
+        })
+    }
+
     createCharacter(projectId: string, input: CharacterInput): Promise<Character> {
         return this.enqueueOperation(async () => {
             const located = await this.findProject(projectId)
@@ -150,6 +193,7 @@ export class ProjectRepository {
                 id: randomUUID(),
                 projectId,
                 ...normalized,
+                tagIds: normalized.tagIds ?? [],
                 createdAt: now,
                 updatedAt: now
             }
@@ -287,6 +331,28 @@ export class ProjectRepository {
         return characters.sort((a, b) => a.name.localeCompare(b.name))
     }
 
+    private async readTags(located: LocatedProject): Promise<Tag[]> {
+        const tagsPath = join(this.dataDirectory, located.directoryName, tagsDirectoryName)
+        let entries
+        try {
+            entries = await readdir(tagsPath, { withFileTypes: true })
+        } catch (error) {
+            if (isFileMissingError(error)) return []
+            throw error
+        }
+
+        const tags: Tag[] = []
+        for (const entry of entries.filter((item) => item.isFile() && item.name.endsWith('.json'))) {
+            try {
+                tags.push(await this.readTag(join(tagsPath, entry.name), located.project.id))
+            } catch (error) {
+                if (error instanceof ProjectRepositoryError && error.code === 'invalid-data') continue
+                throw error
+            }
+        }
+        return tags.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
     private async readCharacter(filePath: string, projectId: string): Promise<Character> {
         let parsed: unknown
         try {
@@ -303,6 +369,8 @@ export class ProjectRepository {
             typeof parsed.name !== 'string' ||
             !Array.isArray(parsed.aliases) ||
             !parsed.aliases.every((alias) => typeof alias === 'string') ||
+            (parsed.tagIds !== undefined &&
+                (!Array.isArray(parsed.tagIds) || !parsed.tagIds.every((tagId) => typeof tagId === 'string'))) ||
             typeof parsed.introduction !== 'string' ||
             typeof parsed.appearance !== 'string' ||
             typeof parsed.personality !== 'string' ||
@@ -321,6 +389,7 @@ export class ProjectRepository {
             projectId: parsed.projectId,
             name: parsed.name,
             aliases: parsed.aliases,
+            tagIds: parsed.tagIds === undefined ? [] : parsed.tagIds,
             introduction: parsed.introduction,
             appearance: parsed.appearance,
             personality: parsed.personality,
@@ -328,6 +397,35 @@ export class ProjectRepository {
             motivation: parsed.motivation,
             abilities: parsed.abilities,
             notes: parsed.notes,
+            createdAt: parsed.createdAt,
+            updatedAt: parsed.updatedAt
+        }
+    }
+
+    private async readTag(filePath: string, projectId: string): Promise<Tag> {
+        let parsed: unknown
+        try {
+            parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown
+        } catch {
+            throw new ProjectRepositoryError('项目标签无法解析为有效 JSON。', 'invalid-data')
+        }
+
+        if (
+            !isRecord(parsed) ||
+            parsed.formatVersion !== formatVersion ||
+            parsed.projectId !== projectId ||
+            typeof parsed.id !== 'string' ||
+            typeof parsed.name !== 'string' ||
+            typeof parsed.createdAt !== 'string' ||
+            typeof parsed.updatedAt !== 'string'
+        ) {
+            throw new ProjectRepositoryError('项目标签缺少必需字段或字段格式错误。', 'invalid-data')
+        }
+
+        return {
+            id: parsed.id,
+            projectId: parsed.projectId,
+            name: parsed.name,
             createdAt: parsed.createdAt,
             updatedAt: parsed.updatedAt
         }
@@ -344,12 +442,45 @@ export class ProjectRepository {
         if (duplicate) throw new ProjectRepositoryError(`角色姓名“${name}”已存在，请换一个姓名。`, 'duplicate-name')
     }
 
+    private async assertTagNameAvailable(located: LocatedProject, name: string, excludingId?: string): Promise<void> {
+        const duplicate = (await this.readTags(located)).find(
+            (tag) => tag.id !== excludingId && tagNameKey(tag.name) === tagNameKey(name)
+        )
+        if (duplicate) throw new ProjectRepositoryError(`标签“${name}”已存在，请换一个名称。`, 'duplicate-name')
+    }
+
     private async writeCharacter(located: LocatedProject, character: Character): Promise<void> {
         const profilePath = join(this.dataDirectory, located.directoryName, profileDirectoryName)
         await mkdir(profilePath, { recursive: true })
         const filePath = join(profilePath, `${character.id}.json`)
         const temporaryPath = `${filePath}.${randomUUID()}.tmp`
         const metadata: CharacterMetadata = { formatVersion, ...character }
+        try {
+            await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
+            await rename(temporaryPath, filePath)
+        } finally {
+            await rm(temporaryPath, { force: true })
+        }
+    }
+
+    private async writeTag(located: LocatedProject, tag: Tag, preservePrevious = false): Promise<void> {
+        const tagsPath = join(this.dataDirectory, located.directoryName, tagsDirectoryName)
+        await mkdir(tagsPath, { recursive: true })
+        const filePath = join(tagsPath, `${tag.id}.json`)
+        if (preservePrevious) {
+            const previousContents = await readFile(filePath, 'utf8')
+            await this.readTag(filePath, tag.projectId)
+            const backupPath = `${filePath}.bak`
+            const temporaryBackupPath = `${backupPath}.${randomUUID()}.tmp`
+            try {
+                await writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
+                await rename(temporaryBackupPath, backupPath)
+            } finally {
+                await rm(temporaryBackupPath, { force: true })
+            }
+        }
+        const temporaryPath = `${filePath}.${randomUUID()}.tmp`
+        const metadata: TagMetadata = { formatVersion, ...tag }
         try {
             await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
             await rename(temporaryPath, filePath)
@@ -512,6 +643,7 @@ function normalizeCharacterInput(input: CharacterInput): CharacterInput {
     return {
         name: input.name.trim(),
         aliases: input.aliases.map((alias) => alias.trim()).filter(Boolean),
+        tagIds: [...new Set(input.tagIds ?? [])],
         introduction: input.introduction.trim(),
         appearance: input.appearance.trim(),
         personality: input.personality.trim(),
@@ -522,11 +654,24 @@ function normalizeCharacterInput(input: CharacterInput): CharacterInput {
     }
 }
 
+function normalizeTagInput(input: TagInput): TagInput {
+    const name = input.name.trim()
+    if (!name) throw new ProjectRepositoryError('请填写标签名称。', 'invalid-name')
+    if (name.length > 80 || hasControlCharacters(name)) {
+        throw new ProjectRepositoryError('标签名称过长或包含不可用字符。', 'invalid-name')
+    }
+    return { name }
+}
+
 function projectNameKey(value: string): string {
     return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
 }
 
 function characterNameKey(value: string): string {
+    return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
+}
+
+function tagNameKey(value: string): string {
     return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
 }
 
