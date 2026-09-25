@@ -96,6 +96,36 @@ test('saves project edits and renames the project directory', async ({ page, pro
     await expect(page.getByRole('row', { name: /雾港新编/ })).toContainText('更新后的简介')
 })
 
+// Given a project and character with saved changes
+// When the user opens their history before and after restarting the app
+// Then the project and character summaries remain visible
+test('shows project and character history across an app restart', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    const projectUrl = page.url()
+
+    await page.getByRole('button', { name: '查看项目变更历史' }).click()
+    await expect(page.getByRole('region', { name: '项目变更历史' })).toContainText('创建项目')
+
+    await createCharacterThroughUi(page, { name: '沈潮生' })
+    await page.getByRole('button', { name: '查看角色变更历史' }).click()
+    await expect(page.getByRole('region', { name: '角色变更历史' })).toContainText('创建角色')
+
+    await page.getByRole('button', { name: '编辑角色' }).click()
+    await page.getByLabel('角色简介').fill('旧港口的领航员。')
+    await page.getByRole('button', { name: '保存角色' }).click()
+    await expect(page.getByRole('region', { name: '角色变更历史' })).toContainText('修改角色简介')
+
+    await projectApp.restart()
+    await page.goto(projectApp.url + new URL(projectUrl).search)
+    await page.getByRole('button', { name: '查看项目变更历史' }).click()
+    await expect(page.getByRole('region', { name: '项目变更历史' })).toContainText('创建项目')
+    await page.getByRole('button', { name: '打开 沈潮生' }).click()
+    await page.getByRole('button', { name: '查看角色变更历史' }).click()
+    await expect(page.getByRole('region', { name: '角色变更历史' })).toContainText('修改角色简介')
+})
+
 // Given a project already uses a name
 // When the user creates or renames another project to a case-equivalent name
 // Then the form rejects the duplicate and leaves both existing projects intact
@@ -134,12 +164,17 @@ test('deletes and restores projects and characters from the browser', async ({ p
 
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('button', { name: '删除角色' }).click()
+    await page.getByRole('button', { name: '查看角色变更历史' }).click()
+    await expect(page.getByRole('region', { name: '角色变更历史' })).toContainText('删除角色')
     await page.getByRole('button', { name: '角色列表' }).click()
     await expect(page.getByRole('heading', { name: '已删除角色' })).toBeVisible()
     await expect(page.getByRole('button', { name: '恢复 沈潮生' })).toBeVisible()
 
     await page.getByRole('button', { name: '恢复 沈潮生' }).click()
     await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await page.getByRole('button', { name: '打开 沈潮生' }).click()
+    await page.getByRole('button', { name: '查看角色变更历史' }).click()
+    await expect(page.getByRole('region', { name: '角色变更历史' })).toContainText('恢复角色')
 
     await page.getByRole('button', { name: '全部项目' }).click()
     await page.getByRole('button', { name: '打开 雾港编年' }).click()
@@ -153,11 +188,15 @@ test('deletes and restores projects and characters from the browser', async ({ p
 
     await page.getByRole('button', { name: '打开 雾港编年' }).click()
     await expect(page.getByText('项目已删除')).toBeVisible()
+    await page.getByRole('button', { name: '查看项目变更历史' }).click()
+    await expect(page.getByRole('region', { name: '项目变更历史' })).toContainText('删除项目')
     await expect(page.getByRole('heading', { name: '归档角色' })).toBeVisible()
     await expect(page.getByRole('heading', { name: '沈潮生' })).toBeVisible()
     await expect(page.getByRole('button', { name: '＋ 新建角色' })).toHaveCount(0)
     await page.getByRole('button', { name: '恢复项目' }).click()
     await expect(page.getByRole('button', { name: '删除项目' })).toBeVisible()
+    await page.getByRole('button', { name: '查看项目变更历史' }).click()
+    await expect(page.getByRole('region', { name: '项目变更历史' })).toContainText('恢复项目')
     await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
 
     await projectApp.restart()

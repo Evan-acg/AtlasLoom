@@ -1,5 +1,6 @@
 <script setup lang="ts">
-    import { computed } from 'vue'
+    import { computed, ref } from 'vue'
+    import ChangeHistory from '../components/ChangeHistory.vue'
     import type { Character } from '../types/character'
     import type { Project } from '../types/project'
 
@@ -18,6 +19,7 @@
     const sortedCharacters = computed(() =>
         [...props.characters, ...props.deletedCharacters].sort((a, b) => a.name.localeCompare(b.name))
     )
+    const showHistory = ref(false)
 
     function restoreArchivedProject() {
         if (!props.project) return
@@ -75,14 +77,31 @@
                             项目已删除，角色不会出现在正常工作区。
                         </p>
                     </div>
-                    <button
-                        class="min-h-11 shrink-0 rounded-full bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        type="button"
-                        @click="restoreArchivedProject"
-                    >
-                        恢复项目
-                    </button>
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                        <button
+                            class="min-h-11 rounded-full border border-hairline bg-surface px-4 text-sm font-semibold hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            type="button"
+                            :aria-expanded="showHistory"
+                            :aria-label="showHistory ? '收起项目变更历史' : '查看项目变更历史'"
+                            @click="showHistory = !showHistory"
+                        >
+                            {{ showHistory ? '收起变更历史' : '变更历史' }}
+                        </button>
+                        <button
+                            class="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            type="button"
+                            @click="restoreArchivedProject"
+                        >
+                            恢复项目
+                        </button>
+                    </div>
                 </header>
+
+                <ChangeHistory
+                    v-if="showHistory"
+                    subject="项目"
+                    :entries="project.history"
+                />
 
                 <div class="px-5 py-7 sm:px-7 sm:py-9">
                     <h2 class="text-lg font-semibold">归档角色</h2>

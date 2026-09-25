@@ -1,5 +1,6 @@
 import type { Character } from '../types/character.ts'
-import type { Project, ProjectHistoryEntry } from '../types/project.ts'
+import type { HistoryEntry } from '../types/history.ts'
+import type { Project } from '../types/project.ts'
 import type { Tag } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 
@@ -92,7 +93,8 @@ function decodeCharacter(value: unknown, projectId: string): Character {
         typeof value.abilities !== 'string' ||
         typeof value.notes !== 'string' ||
         typeof value.createdAt !== 'string' ||
-        typeof value.updatedAt !== 'string'
+        typeof value.updatedAt !== 'string' ||
+        (value.history !== undefined && (!Array.isArray(value.history) || !value.history.every(isHistoryEntry)))
     ) {
         throw new ProjectJsonCodecError('character', 'invalid-fields')
     }
@@ -112,7 +114,8 @@ function decodeCharacter(value: unknown, projectId: string): Character {
         notes: value.notes,
         createdAt: value.createdAt,
         updatedAt: value.updatedAt,
-        ...(typeof value.deletedAt === 'string' ? { deletedAt: value.deletedAt } : {})
+        ...(typeof value.deletedAt === 'string' ? { deletedAt: value.deletedAt } : {}),
+        history: value.history === undefined ? [{ at: value.createdAt, summary: '创建角色' }] : value.history
     }
 }
 
@@ -141,6 +144,6 @@ function hasVersion(value: unknown): value is Record<string, unknown> & { format
     return isRecord(value) && value.formatVersion === projectFormatVersion
 }
 
-function isHistoryEntry(value: unknown): value is ProjectHistoryEntry {
+function isHistoryEntry(value: unknown): value is HistoryEntry {
     return isRecord(value) && typeof value.at === 'string' && typeof value.summary === 'string'
 }

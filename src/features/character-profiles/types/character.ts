@@ -1,3 +1,7 @@
+import type { HistoryEntry } from './history'
+
+export type CharacterHistoryEntry = HistoryEntry
+
 export interface Character {
     id: string
     projectId: string
@@ -14,9 +18,10 @@ export interface Character {
     createdAt: string
     updatedAt: string
     deletedAt?: string
+    history: CharacterHistoryEntry[]
 }
 
-export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt' | 'tagIds'> & {
+export type CharacterInput = Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt' | 'tagIds' | 'history'> & {
     tagIds?: string[]
 }
 

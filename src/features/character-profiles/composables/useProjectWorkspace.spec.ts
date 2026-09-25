@@ -625,7 +625,8 @@ function createCharacter(id: string, projectId: string): Character {
         abilities: '',
         notes: '',
         createdAt: '',
-        updatedAt: ''
+        updatedAt: '',
+        history: []
     }
 }
 

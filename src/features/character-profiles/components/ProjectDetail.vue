@@ -1,7 +1,10 @@
 <script setup lang="ts">
+    import { ref } from 'vue'
+    import ChangeHistory from './ChangeHistory.vue'
     import type { Project } from '../types/project'
 
-    defineProps<{ project: Project }>()
+    const props = defineProps<{ project: Project }>()
+    const showHistory = ref(false)
     const emit = defineEmits<{
         back: []
         edit: []
@@ -38,6 +41,15 @@
             </div>
             <div class="flex shrink-0 flex-wrap gap-2">
                 <button
+                    class="min-h-11 rounded-full border border-hairline bg-surface px-4 text-sm font-semibold hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    type="button"
+                    :aria-expanded="showHistory"
+                    :aria-label="showHistory ? '收起项目变更历史' : '查看项目变更历史'"
+                    @click="showHistory = !showHistory"
+                >
+                    {{ showHistory ? '收起变更历史' : '变更历史' }}
+                </button>
+                <button
                     v-if="!project.deletedAt"
                     class="min-h-11 rounded-full border border-hairline bg-surface px-4 text-sm font-semibold hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     type="button"
@@ -64,6 +76,11 @@
                 </button>
             </div>
         </header>
+        <ChangeHistory
+            v-if="showHistory"
+            subject="项目"
+            :entries="props.project.history"
+        />
         <slot />
     </section>
 </template>
