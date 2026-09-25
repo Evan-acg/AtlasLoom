@@ -1,30 +1,8 @@
 import { computed, ref } from 'vue'
-import type { Character, CharacterInput, CharacterListResult } from '../types/character'
+import type { Character, CharacterInput } from '../types/character'
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from '../types/project'
-import type { Tag, TagInput, TagListResult } from '../types/tag'
-
-export interface ProjectWorkspaceAdapters {
-    projects: {
-        list: () => Promise<ProjectListResult>
-        create: (input: ProjectInput) => Promise<Project>
-        update: (id: string, input: ProjectInput) => Promise<Project>
-        remove: (id: string) => Promise<Project>
-        restore: (id: string) => Promise<Project>
-        repair: (directoryName: string, resolution: ProjectRepairResolution) => Promise<void>
-    }
-    characters: {
-        list: (projectId: string) => Promise<CharacterListResult>
-        create: (projectId: string, input: CharacterInput) => Promise<Character>
-        update: (projectId: string, characterId: string, input: CharacterInput) => Promise<Character>
-        remove: (projectId: string, characterId: string) => Promise<Character>
-        restore: (projectId: string, characterId: string) => Promise<Character>
-    }
-    tags: {
-        list: (projectId: string) => Promise<TagListResult>
-        create: (projectId: string, input: TagInput) => Promise<Tag>
-        rename: (projectId: string, tagId: string, input: TagInput) => Promise<Tag>
-    }
-}
+import type { Tag, TagInput } from '../types/tag'
+import type { ProjectWorkspaceAdapters } from '../types/workspace'
 
 export function useProjectWorkspace(adapters: ProjectWorkspaceAdapters) {
     const projects = ref<Project[]>([])

@@ -4,6 +4,7 @@ import type { ProjectInput, ProjectRepairResolution } from '../types/project.ts'
 import type { TagInput } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
 import { ProjectRepository, ProjectRepositoryError } from './project-repository.ts'
+import type { ProjectRepositoryFactory, ProjectRepositoryPort } from './project-repository-port.ts'
 
 const maximumRequestBytes = 64 * 1024
 
@@ -16,8 +17,11 @@ class ApiError extends Error {
     }
 }
 
-export function createProjectApiMiddleware(dataDirectory: string) {
-    const repository = new ProjectRepository(dataDirectory)
+export function createProjectApiMiddleware(
+    dataDirectory: string,
+    createRepository: ProjectRepositoryFactory = (directory) => new ProjectRepository(directory)
+) {
+    const repository = createRepository(dataDirectory)
 
     return (request: IncomingMessage, response: ServerResponse) => {
         void handleRequest(request, response, repository).catch((error: unknown) => {
@@ -32,7 +36,7 @@ export function createProjectApiMiddleware(dataDirectory: string) {
 async function handleRequest(
     request: IncomingMessage,
     response: ServerResponse,
-    repository: ProjectRepository
+    repository: ProjectRepositoryPort
 ): Promise<void> {
     response.setHeader('Cache-Control', 'no-store')
     if (!isLoopbackAddress(request.socket.remoteAddress)) {

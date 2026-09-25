@@ -1,4 +1,3 @@
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { basename, join, resolve } from 'node:path'
 import { Buffer } from 'node:buffer'
@@ -11,9 +10,12 @@ import type {
     ProjectStorageIssue,
     ProjectInput
 } from '../types/project.ts'
-import type { Character, CharacterInput } from '../types/character.ts'
+import type { Character, CharacterInput, CharacterListResult } from '../types/character.ts'
 import type { Tag, TagInput, TagListResult } from '../types/tag.ts'
 import { isRecord } from './guards.ts'
+import { nodeProjectFileSystem, type ProjectFileSystem } from './project-file-system.ts'
+import { projectJsonCodec, type ProjectJsonCodec } from './project-json-codec.ts'
+import type { ProjectRepositoryPort } from './project-repository-port.ts'
 
 const formatVersion = 1
 const metadataFileName = 'metadata.json'
@@ -50,12 +52,20 @@ export class ProjectRepositoryError extends Error {
     }
 }
 
-export class ProjectRepository {
+export class ProjectRepository implements ProjectRepositoryPort {
     private readonly dataDirectory: string
+    private readonly fileSystem: ProjectFileSystem
+    private readonly jsonCodec: ProjectJsonCodec
     private operationQueue: Promise<void> = Promise.resolve()
 
-    constructor(dataDirectory: string) {
+    constructor(
+        dataDirectory: string,
+        fileSystem: ProjectFileSystem = nodeProjectFileSystem,
+        jsonCodec: ProjectJsonCodec = projectJsonCodec
+    ) {
         this.dataDirectory = resolve(dataDirectory)
+        this.fileSystem = fileSystem
+        this.jsonCodec = jsonCodec
     }
 
     listProjects(): Promise<ProjectListResult> {
@@ -78,9 +88,9 @@ export class ProjectRepository {
             }
             const directoryPath = join(this.dataDirectory, name)
 
-            await mkdir(this.dataDirectory, { recursive: true })
+            await this.fileSystem.mkdir(this.dataDirectory, { recursive: true })
             try {
-                await mkdir(directoryPath)
+                await this.fileSystem.mkdir(directoryPath)
             } catch (error) {
                 if (isFileExistsError(error)) throw duplicateNameError(name)
                 throw error
@@ -89,7 +99,7 @@ export class ProjectRepository {
             try {
                 await this.writeMetadata(directoryPath, project, false)
             } catch (error) {
-                await rm(directoryPath, { recursive: true, force: true })
+                await this.fileSystem.rm(directoryPath, { recursive: true, force: true })
                 throw error
             }
 
@@ -172,7 +182,7 @@ export class ProjectRepository {
         })
     }
 
-    listCharacters(projectId: string): Promise<{ characters: Character[] }> {
+    listCharacters(projectId: string): Promise<CharacterListResult> {
         return this.enqueueOperation(async () => {
             const located = await this.findProject(projectId)
             const characters = await this.readCharacters(located)
@@ -337,8 +347,8 @@ export class ProjectRepository {
     }
 
     private async readProjects(): Promise<ProjectListResult> {
-        await mkdir(this.dataDirectory, { recursive: true })
-        const entries = await readdir(this.dataDirectory, { withFileTypes: true })
+        await this.fileSystem.mkdir(this.dataDirectory, { recursive: true })
+        const entries = await this.fileSystem.readdir(this.dataDirectory, { withFileTypes: true })
         const projects: Project[] = []
         const deletedProjects: Project[] = []
         const issues: ProjectStorageIssue[] = []
@@ -387,7 +397,7 @@ export class ProjectRepository {
         const profilePath = join(this.dataDirectory, located.directoryName, profileDirectoryName)
         let entries
         try {
-            entries = await readdir(profilePath, { withFileTypes: true })
+            entries = await this.fileSystem.readdir(profilePath, { withFileTypes: true })
         } catch (error) {
             if (isFileMissingError(error)) return []
             throw error
@@ -404,7 +414,7 @@ export class ProjectRepository {
         const tagsPath = join(this.dataDirectory, located.directoryName, tagsDirectoryName)
         let entries
         try {
-            entries = await readdir(tagsPath, { withFileTypes: true })
+            entries = await this.fileSystem.readdir(tagsPath, { withFileTypes: true })
         } catch (error) {
             if (isFileMissingError(error)) return []
             throw error
@@ -425,7 +435,7 @@ export class ProjectRepository {
     private async readCharacter(filePath: string, projectId: string): Promise<Character> {
         let parsed: unknown
         try {
-            parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown
+            parsed = this.jsonCodec.parse(await this.fileSystem.readFile(filePath, 'utf8'))
         } catch {
             throw new ProjectRepositoryError('角色档案无法解析为有效 JSON。', 'invalid-data')
         }
@@ -475,7 +485,7 @@ export class ProjectRepository {
     private async readTag(filePath: string, projectId: string): Promise<Tag> {
         let parsed: unknown
         try {
-            parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown
+            parsed = this.jsonCodec.parse(await this.fileSystem.readFile(filePath, 'utf8'))
         } catch {
             throw new ProjectRepositoryError('项目标签无法解析为有效 JSON。', 'invalid-data')
         }
@@ -521,41 +531,41 @@ export class ProjectRepository {
 
     private async writeCharacter(located: LocatedProject, character: Character): Promise<void> {
         const profilePath = join(this.dataDirectory, located.directoryName, profileDirectoryName)
-        await mkdir(profilePath, { recursive: true })
+        await this.fileSystem.mkdir(profilePath, { recursive: true })
         const filePath = join(profilePath, `${character.id}.json`)
         const temporaryPath = `${filePath}.${randomUUID()}.tmp`
         const metadata: CharacterMetadata = { formatVersion, ...character }
         try {
-            await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
-            await rename(temporaryPath, filePath)
+            await this.fileSystem.writeFile(temporaryPath, this.jsonCodec.stringify(metadata), { flag: 'wx' })
+            await this.fileSystem.rename(temporaryPath, filePath)
         } finally {
-            await rm(temporaryPath, { force: true })
+            await this.fileSystem.rm(temporaryPath, { force: true })
         }
     }
 
     private async writeTag(located: LocatedProject, tag: Tag, preservePrevious = false): Promise<void> {
         const tagsPath = join(this.dataDirectory, located.directoryName, tagsDirectoryName)
-        await mkdir(tagsPath, { recursive: true })
+        await this.fileSystem.mkdir(tagsPath, { recursive: true })
         const filePath = join(tagsPath, `${tag.id}.json`)
         if (preservePrevious) {
-            const previousContents = await readFile(filePath, 'utf8')
+            const previousContents = await this.fileSystem.readFile(filePath, 'utf8')
             await this.readTag(filePath, tag.projectId)
             const backupPath = `${filePath}.bak`
             const temporaryBackupPath = `${backupPath}.${randomUUID()}.tmp`
             try {
-                await writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
-                await rename(temporaryBackupPath, backupPath)
+                await this.fileSystem.writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
+                await this.fileSystem.rename(temporaryBackupPath, backupPath)
             } finally {
-                await rm(temporaryBackupPath, { force: true })
+                await this.fileSystem.rm(temporaryBackupPath, { force: true })
             }
         }
         const temporaryPath = `${filePath}.${randomUUID()}.tmp`
         const metadata: TagMetadata = { formatVersion, ...tag }
         try {
-            await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
-            await rename(temporaryPath, filePath)
+            await this.fileSystem.writeFile(temporaryPath, this.jsonCodec.stringify(metadata), { flag: 'wx' })
+            await this.fileSystem.rename(temporaryPath, filePath)
         } finally {
-            await rm(temporaryPath, { force: true })
+            await this.fileSystem.rm(temporaryPath, { force: true })
         }
     }
 
@@ -586,7 +596,7 @@ export class ProjectRepository {
     private async readMetadata(filePath: string): Promise<Project> {
         let parsed: unknown
         try {
-            parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown
+            parsed = this.jsonCodec.parse(await this.fileSystem.readFile(filePath, 'utf8'))
         } catch (error) {
             if (isFileMissingError(error))
                 throw new ProjectRepositoryError('项目 metadata.json 不存在。', 'invalid-data')
@@ -623,46 +633,46 @@ export class ProjectRepository {
     private async writeMetadata(directoryPath: string, project: Project, preservePrevious: boolean): Promise<void> {
         const metadataPath = join(directoryPath, metadataFileName)
         if (preservePrevious) {
-            const previousContents = await readFile(metadataPath, 'utf8')
+            const previousContents = await this.fileSystem.readFile(metadataPath, 'utf8')
             await this.readMetadata(metadataPath)
             const backupPath = join(directoryPath, backupFileName)
             const temporaryBackupPath = `${backupPath}.${randomUUID()}.tmp`
             try {
-                await writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
-                await rename(temporaryBackupPath, backupPath)
+                await this.fileSystem.writeFile(temporaryBackupPath, previousContents, { flag: 'wx' })
+                await this.fileSystem.rename(temporaryBackupPath, backupPath)
             } finally {
-                await rm(temporaryBackupPath, { force: true })
+                await this.fileSystem.rm(temporaryBackupPath, { force: true })
             }
         }
 
         const temporaryPath = `${metadataPath}.${randomUUID()}.tmp`
         const metadata: ProjectMetadata = { formatVersion, ...project }
         try {
-            await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' })
-            await rename(temporaryPath, metadataPath)
+            await this.fileSystem.writeFile(temporaryPath, this.jsonCodec.stringify(metadata), { flag: 'wx' })
+            await this.fileSystem.rename(temporaryPath, metadataPath)
         } finally {
-            await rm(temporaryPath, { force: true })
+            await this.fileSystem.rm(temporaryPath, { force: true })
         }
     }
 
     private async renameDirectory(currentPath: string, nextPath: string): Promise<void> {
         if (projectNameKey(basename(currentPath)) === projectNameKey(basename(nextPath))) {
             const temporaryPath = `${currentPath}.rename-${randomUUID()}`
-            await rename(currentPath, temporaryPath)
+            await this.fileSystem.rename(currentPath, temporaryPath)
             try {
-                await rename(temporaryPath, nextPath)
+                await this.fileSystem.rename(temporaryPath, nextPath)
             } catch (error) {
-                await rename(temporaryPath, currentPath)
+                await this.fileSystem.rename(temporaryPath, currentPath)
                 throw error
             }
             return
         }
-        await rename(currentPath, nextPath)
+        await this.fileSystem.rename(currentPath, nextPath)
     }
 
     private async hasValidBackup(directoryPath: string): Promise<boolean> {
         try {
-            await stat(join(directoryPath, backupFileName))
+            await this.fileSystem.stat(join(directoryPath, backupFileName))
             await this.readMetadata(join(directoryPath, backupFileName))
             return true
         } catch {
