@@ -23,8 +23,7 @@ export async function updateProject(id: string, input: ProjectInput): Promise<Pr
 
 export async function deleteProject(id: string): Promise<Project> {
     const result = await request<{ project: Project }>(
-        `/projects/${encodeURIComponent(id)}`,
-        { method: 'DELETE' },
+        { url: `/projects/${encodeURIComponent(id)}`, method: 'DELETE' },
         '请求本地项目服务失败。'
     )
     return result.project
@@ -32,8 +31,7 @@ export async function deleteProject(id: string): Promise<Project> {
 
 export async function restoreProject(id: string): Promise<Project> {
     const result = await request<{ project: Project }>(
-        `/projects/${encodeURIComponent(id)}/restore`,
-        { method: 'POST' },
+        { url: `/projects/${encodeURIComponent(id)}/restore`, method: 'POST' },
         '请求本地项目服务失败。'
     )
     return result.project

@@ -34,8 +34,7 @@ export async function updateCharacter(
 
 export async function deleteCharacter(projectId: string, characterId: string): Promise<Character> {
     const result = await request<{ character: Character }>(
-        `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}`,
-        { method: 'DELETE' },
+        { url: `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}`, method: 'DELETE' },
         '请求本地角色服务失败。'
     )
     return result.character
@@ -43,8 +42,10 @@ export async function deleteCharacter(projectId: string, characterId: string): P
 
 export async function restoreCharacter(projectId: string, characterId: string): Promise<Character> {
     const result = await request<{ character: Character }>(
-        `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}/restore`,
-        { method: 'POST' },
+        {
+            url: `/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(characterId)}/restore`,
+            method: 'POST'
+        },
         '请求本地角色服务失败。'
     )
     return result.character
