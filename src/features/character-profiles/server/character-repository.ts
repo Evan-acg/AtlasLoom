@@ -34,7 +34,8 @@ export class CharacterRepository {
             ...normalized,
             tagIds: normalized.tagIds ?? [],
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            history: [{ at: now, summary: '创建角色' }]
         }
         await this.storage.writeCharacter(located.directoryName, character)
         return character
@@ -49,7 +50,13 @@ export class CharacterRepository {
         await this.tags.assertTagsBelongToProject(located.directoryName, located.project.id, normalized.tagIds ?? [])
         await this.assertNameAvailable(located.directoryName, located.project.id, normalized.name, characterId)
         if (JSON.stringify({ ...current, ...normalized }) === JSON.stringify(current)) return current
-        const updated: Character = { ...current, ...normalized, updatedAt: new Date().toISOString() }
+        const now = new Date().toISOString()
+        const updated: Character = {
+            ...current,
+            ...normalized,
+            updatedAt: now,
+            history: [{ at: now, summary: characterChangeSummary(current, normalized) }, ...current.history]
+        }
         await this.storage.writeCharacter(located.directoryName, updated)
         return updated
     }
@@ -60,7 +67,13 @@ export class CharacterRepository {
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         if (current.deletedAt) return current
-        const deleted: Character = { ...current, deletedAt: new Date().toISOString() }
+        const now = new Date().toISOString()
+        const deleted: Character = {
+            ...current,
+            deletedAt: now,
+            updatedAt: now,
+            history: [{ at: now, summary: '删除角色' }, ...current.history]
+        }
         await this.storage.writeCharacter(located.directoryName, deleted)
         return deleted
     }
@@ -71,7 +84,12 @@ export class CharacterRepository {
         const current = characters.find((character) => character.id === characterId)
         if (!current) throw new ProjectRepositoryError('找不到该角色。', 'not-found')
         if (!current.deletedAt) return current
-        const restored: Character = { ...current, updatedAt: new Date().toISOString() }
+        const now = new Date().toISOString()
+        const restored: Character = {
+            ...current,
+            updatedAt: now,
+            history: [{ at: now, summary: '恢复角色' }, ...current.history]
+        }
         delete restored.deletedAt
         await this.storage.writeCharacter(located.directoryName, restored)
         return restored
@@ -126,4 +144,19 @@ function normalizeCharacterInput(input: CharacterInput): CharacterInput {
 
 function characterNameKey(value: string): string {
     return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
+}
+
+function characterChangeSummary(current: Character, next: CharacterInput): string {
+    const changes: string[] = []
+    if (current.name !== next.name) changes.push('修改角色姓名')
+    if (JSON.stringify(current.aliases) !== JSON.stringify(next.aliases)) changes.push('修改角色别名')
+    if (current.introduction !== next.introduction) changes.push('修改角色简介')
+    if (current.appearance !== next.appearance) changes.push('修改角色外貌')
+    if (current.personality !== next.personality) changes.push('修改角色性格')
+    if (current.backstory !== next.backstory) changes.push('修改角色背景故事')
+    if (current.motivation !== next.motivation) changes.push('修改角色动机')
+    if (current.abilities !== next.abilities) changes.push('修改角色能力')
+    if (current.notes !== next.notes) changes.push('修改角色备注')
+    if (JSON.stringify(current.tagIds) !== JSON.stringify(next.tagIds ?? [])) changes.push('修改角色标签')
+    return changes.join('、')
 }

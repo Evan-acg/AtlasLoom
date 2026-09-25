@@ -1,7 +1,6 @@
-export interface ProjectHistoryEntry {
-    at: string
-    summary: string
-}
+import type { HistoryEntry } from './history'
+
+export type ProjectHistoryEntry = HistoryEntry
 
 export interface Project {
     id: string
