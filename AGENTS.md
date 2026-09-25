@@ -22,6 +22,12 @@ Follow the root `ARCHITECTURE.md` for file placement and source dependency bound
 
 Follow the root `DESIGN.md` for UI implementation and visual changes.
 
+## AI development workflow
+
+- For any code generation or code modification, invoke the global `ai-development-workflow` skill and read `.agents/docs/agents/ai-development-workflow.md` before editing. The global skill defines the reusable discovery, design, implementation, review, and verification sequence; the local document defines AtlasLoom-specific constraints.
+- When a change touches Vue SFCs, Vue reactivity, composables, Pinia, or feature UI state, also read the global skill's `vue.md` reference and `.agents/docs/agents/vue-development.md`. They define the reusable Vue rules and AtlasLoom-specific boundaries respectively.
+- Treat these documents as delivery gates for product code. Prototype code under `src/**/prototypes/` is the only default exception; it must be reorganized before becoming production code.
+
 ## Browser and visual inspection
 
 - Use the project-local Playwright CLI for the running app and publicly accessible webpages. Do not sign in, reuse stored credentials, or save browser state.
