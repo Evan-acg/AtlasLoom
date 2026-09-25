@@ -1,5 +1,5 @@
 import type { Project, ProjectInput, ProjectListResult, ProjectRepairResolution } from '../types/project'
-import { request } from '../../../shared/utils/request'
+import { request } from './request'
 
 export async function listProjects(): Promise<ProjectListResult> {
     return request<ProjectListResult>({ url: '/projects' }, '请求本地项目服务失败。')

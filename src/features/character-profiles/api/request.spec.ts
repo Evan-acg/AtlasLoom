@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, request } from './request'
 
-describe('shared request wrapper', () => {
+describe('character profiles request wrapper', () => {
     afterEach(() => {
         vi.restoreAllMocks()
         vi.unstubAllGlobals()
     })
 
     // Given the API responds with an error payload
-    // When the shared request wrapper sends an axios request
+    // When the request wrapper sends an axios request
     // Then it throws the server error message
     it('uses the server error message for axios responses', async () => {
         vi.spyOn(apiClient, 'request').mockRejectedValue({
@@ -20,7 +20,7 @@ describe('shared request wrapper', () => {
     })
 
     // Given the request cannot reach the server
-    // When the shared request wrapper sends an axios request
+    // When the request wrapper sends an axios request
     // Then it throws the provided fallback message
     it('uses the fallback message for non-response failures', async () => {
         vi.spyOn(apiClient, 'request').mockRejectedValue(new Error('network failure'))
