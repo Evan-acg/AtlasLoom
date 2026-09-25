@@ -42,7 +42,7 @@
         if (!project.value) return
         try {
             await restoreProject(project.value.id)
-            globalThis.location.reload()
+            globalThis.dispatchEvent(new globalThis.CustomEvent('atlasloom:data-changed'))
         } catch (reason) {
             error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
         }

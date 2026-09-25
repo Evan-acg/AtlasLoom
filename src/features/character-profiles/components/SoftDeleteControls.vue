@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { computed, onMounted, ref, watch } from 'vue'
+    import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
     import { useRoute, useRouter } from 'vue-router'
     import { listCharacters, restoreCharacter } from '../api/characters'
     import { listProjects, restoreProject } from '../api/projects'
@@ -18,7 +18,11 @@
         if (typeof projectId !== 'string') return null
         return [...projects.value, ...deletedProjects.value].find((project) => project.id === projectId) ?? null
     })
-    onMounted(() => void load())
+    onMounted(() => {
+        globalThis.addEventListener('atlasloom:data-changed', load)
+        void load()
+    })
+    onUnmounted(() => globalThis.removeEventListener('atlasloom:data-changed', load))
     watch(
         () => `${route.query.project ?? ''}:${route.query.character ?? ''}`,
         () => void load()
@@ -45,7 +49,7 @@
         if (!project) return
         try {
             await restoreProject(project.id)
-            globalThis.location.reload()
+            globalThis.dispatchEvent(new globalThis.CustomEvent('atlasloom:data-changed'))
         } catch (reason) {
             error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
         }
@@ -55,7 +59,7 @@
         if (!selectedProject.value) return
         try {
             await restoreCharacter(selectedProject.value.id, character.id)
-            globalThis.location.reload()
+            globalThis.dispatchEvent(new globalThis.CustomEvent('atlasloom:data-changed'))
         } catch (reason) {
             error.value = reason instanceof Error ? reason.message : '本地项目服务暂时无法处理请求。'
         }
