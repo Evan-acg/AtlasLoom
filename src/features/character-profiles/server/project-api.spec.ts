@@ -302,4 +302,56 @@ describe('project API', () => {
             deletedCharacters: []
         })
     })
+
+    it('previews and applies a complete backup through the local API', async () => {
+        const createResponse = await fetch(`${baseUrl}/projects`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年', description: '原始简介' })
+        })
+        const created = (await createResponse.json()) as { project: { id: string } }
+        const backupResponse = await fetch(`${baseUrl}/backup`)
+        const backup = (await backupResponse.json()) as { projects: Array<{ project: { id: string } }> }
+
+        await fetch(`${baseUrl}/projects/${created.project.id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: '雾港编年', description: '当前简介' })
+        })
+        const previewResponse = await fetch(`${baseUrl}/backup/preview`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ backup, mode: 'merge' })
+        })
+        const preview = (await previewResponse.json()) as { conflicts: Array<{ id: string }> }
+        const applyResponse = await fetch(`${baseUrl}/backup/apply`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                backup,
+                mode: 'merge',
+                decisions: { [preview.conflicts[0]!.id]: { choice: 'use-backup' } }
+            })
+        })
+        const projectsResponse = await fetch(`${baseUrl}/projects`)
+        const archivesResponse = await fetch(`${baseUrl}/backup/archives`)
+        const archives = (await archivesResponse.json()) as { archives: Array<{ id: string }> }
+        const restoreArchiveResponse = await fetch(`${baseUrl}/backup/archives/${archives.archives[0]!.id}`, {
+            method: 'POST'
+        })
+        const restoredProjectsResponse = await fetch(`${baseUrl}/projects`)
+
+        expect(backupResponse.status).toBe(200)
+        expect(backupResponse.headers.get('content-disposition')).toContain('atlasloom-backup.json')
+        expect(previewResponse.status).toBe(200)
+        expect(preview.conflicts).toHaveLength(1)
+        expect(applyResponse.status).toBe(200)
+        await expect(projectsResponse.json()).resolves.toMatchObject({ projects: [{ description: '原始简介' }] })
+        expect(archivesResponse.status).toBe(200)
+        expect(archives.archives).toHaveLength(1)
+        expect(restoreArchiveResponse.status).toBe(200)
+        await expect(restoredProjectsResponse.json()).resolves.toMatchObject({
+            projects: [{ description: '当前简介' }]
+        })
+    })
 })

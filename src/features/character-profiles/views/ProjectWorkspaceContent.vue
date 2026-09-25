@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { ref } from 'vue'
+    import BackupManager from '../components/BackupManager.vue'
     import CharacterJourney from '../components/CharacterJourney.vue'
     import ProjectDetail from '../components/ProjectDetail.vue'
     import ProjectForm from '../components/ProjectForm.vue'
@@ -13,6 +14,15 @@
         projectState: ProjectJourneyState
         characterState: CharacterJourneyState
         selectedCharacterId: string | null
+        exportBackup: () => Promise<unknown>
+        previewBackup: (backup: unknown, mode: 'merge' | 'replace') => Promise<import('../types/backup').BackupPreview>
+        applyBackup: (
+            backup: import('../types/backup').ProjectBackup,
+            mode: 'merge' | 'replace',
+            decisions: import('../types/backup').BackupDecisions
+        ) => Promise<void>
+        listBackupArchives: () => Promise<import('../types/backup').BackupArchive[]>
+        restoreBackupArchive: (id: string) => Promise<void>
         openProject: (project: Project) => void
         showProjectList: () => void
         openCharacter: (characterId: string) => void
@@ -167,6 +177,14 @@
             </template>
 
             <template v-else>
+                <BackupManager
+                    :export-backup="props.exportBackup"
+                    :preview-backup="props.previewBackup"
+                    :apply-backup="props.applyBackup"
+                    :list-backup-archives="props.listBackupArchives"
+                    :restore-backup-archive="props.restoreBackupArchive"
+                    :refresh="props.projectState.refresh"
+                />
                 <ProjectList
                     :projects="projects"
                     :storage-issues="storageIssues"

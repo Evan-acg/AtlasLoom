@@ -221,7 +221,7 @@ function normalizeProjectName(value: string): string {
     return validateFilesystemProjectName(value.trim().normalize('NFC'))
 }
 
-function validateFilesystemProjectName(name: string): string {
+export function validateFilesystemProjectName(name: string): string {
     if (!name) throw new ProjectRepositoryError('请填写项目名称。', 'invalid-name')
     if (
         name === '.' ||
@@ -241,7 +241,7 @@ function validateFilesystemProjectName(name: string): string {
     return name
 }
 
-function projectNameKey(value: string): string {
+export function projectNameKey(value: string): string {
     return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')
 }
 

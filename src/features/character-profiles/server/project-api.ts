@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { BackupDecisions, BackupMode } from '../types/backup.ts'
 import type { CharacterInput } from '../types/character.ts'
 import type { ProjectInput, ProjectRepairResolution } from '../types/project.ts'
 import type { TagInput } from '../types/tag.ts'
@@ -7,7 +8,7 @@ import { ProjectRepository, ProjectRepositoryError } from './project-repository.
 import type { ProjectRepositoryFactory, ProjectRepositoryPort } from './project-repository-port.ts'
 import { getCharacterProfilesErrorMessage } from '../utils/error-message.ts'
 
-const maximumRequestBytes = 64 * 1024
+const maximumRequestBytes = 16 * 1024 * 1024
 
 class ApiError extends Error {
     constructor(
@@ -51,6 +52,35 @@ async function handleRequest(
     const url = new URL(request.url ?? '/', 'http://localhost')
     const pathname = url.pathname
     const segments = pathname.split('/').filter(Boolean)
+    if (segments[0] === 'backup') {
+        if (segments.length === 1 && request.method === 'GET') {
+            sendDownloadJson(response, 200, await repository.exportBackup())
+            return
+        }
+        if (segments.length === 2 && segments[1] === 'archives' && request.method === 'GET') {
+            sendJson(response, 200, { archives: await repository.listBackupArchives() })
+            return
+        }
+        if (segments.length === 3 && segments[1] === 'archives' && request.method === 'POST') {
+            await repository.restoreBackupArchive(decodeSegment(segments[2], '备份标识'))
+            sendJson(response, 200, { restored: true })
+            return
+        }
+        if (segments.length === 2 && segments[1] === 'preview' && request.method === 'POST') {
+            const input = await readBackupPreviewInput(request)
+            sendJson(response, 200, await repository.previewImport(input.backup, input.mode))
+            return
+        }
+        if (segments.length === 2 && segments[1] === 'apply' && request.method === 'POST') {
+            const input = await readBackupApplyInput(request)
+            await repository.applyImport(input.backup, input.mode, input.decisions)
+            sendJson(response, 200, { imported: true })
+            return
+        }
+        response.setHeader('Allow', getBackupAllowedMethods(segments))
+        sendJson(response, 405, { error: '不支持该备份 API 操作。' })
+        return
+    }
     if (segments[0] !== 'projects') {
         sendJson(response, 404, { error: '找不到请求的本地 API。' })
         return
@@ -244,6 +274,34 @@ async function readProjectRepairInput(
     return { directoryName: body.directoryName, resolution: body.resolution }
 }
 
+async function readBackupPreviewInput(request: IncomingMessage): Promise<{ backup: unknown; mode: BackupMode }> {
+    const body = await readJsonRequestBody(request)
+    if (!isRecord(body) || !isBackupMode(body.mode) || !('backup' in body)) {
+        throw new ApiError('备份预览请求格式无效。', 400)
+    }
+    return { backup: body.backup, mode: body.mode }
+}
+
+async function readBackupApplyInput(
+    request: IncomingMessage
+): Promise<{ backup: unknown; mode: BackupMode; decisions: BackupDecisions }> {
+    const body = await readJsonRequestBody(request)
+    if (!isRecord(body) || !isBackupMode(body.mode) || !('backup' in body) || !isRecord(body.decisions)) {
+        throw new ApiError('备份导入请求格式无效。', 400)
+    }
+    const decisions: BackupDecisions = {}
+    for (const [id, value] of Object.entries(body.decisions)) {
+        if (!isRecord(value) || !isBackupDecision(value.choice)) {
+            throw new ApiError('备份冲突选择格式无效。', 400)
+        }
+        decisions[id] = {
+            choice: value.choice,
+            ...(typeof value.name === 'string' ? { name: value.name } : {})
+        }
+    }
+    return { backup: body.backup, mode: body.mode, decisions }
+}
+
 async function readJsonRequestBody(request: IncomingMessage): Promise<unknown> {
     const contentType = request.headers['content-type']?.split(';')[0]?.trim().toLowerCase()
     if (contentType !== 'application/json') throw new ApiError('请求必须使用 JSON 格式。', 415)
@@ -283,6 +341,13 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
     response.end(JSON.stringify(body))
 }
 
+function sendDownloadJson(response: ServerResponse, status: number, body: unknown): void {
+    response.statusCode = status
+    response.setHeader('Content-Type', 'application/json; charset=utf-8')
+    response.setHeader('Content-Disposition', 'attachment; filename="atlasloom-backup.json"')
+    response.end(JSON.stringify(body, null, 2))
+}
+
 function isLoopbackAddress(address: string | undefined): boolean {
     if (!address) return false
     if (address === '::1' || address === '127.0.0.1') return true
@@ -314,6 +379,27 @@ function getErrorStatus(error: unknown): number {
 
 function isProjectRepairResolution(value: unknown): value is ProjectRepairResolution {
     return value === 'directory-name' || value === 'metadata-name' || value === 'restore-backup'
+}
+
+function isBackupMode(value: unknown): value is BackupMode {
+    return value === 'merge' || value === 'replace'
+}
+
+function isBackupDecision(value: unknown): value is BackupDecisions[string]['choice'] {
+    return (
+        value === 'keep-current' ||
+        value === 'use-backup' ||
+        value === 'skip' ||
+        value === 'rename' ||
+        value === 'import-new-id'
+    )
+}
+
+function getBackupAllowedMethods(segments: string[]): string {
+    if (segments.length === 2 && (segments[1] === 'preview' || segments[1] === 'apply')) return 'POST'
+    if (segments.length === 2 && segments[1] === 'archives') return 'GET'
+    if (segments.length === 3 && segments[1] === 'archives') return 'POST'
+    return 'GET, POST'
 }
 
 function decodeSegment(value: string | undefined, label: string): string {

@@ -16,6 +16,7 @@
         restoreProject,
         updateProject
     } from '../api/projects'
+    import { applyBackup, exportBackup, listBackupArchives, previewBackup, restoreBackupArchive } from '../api/backups'
     import { createTag, listTags, renameTag } from '../api/tags'
     import ArchivedProjectView from './ArchivedProjectView.vue'
     import ProjectWorkspaceContent from './ProjectWorkspaceContent.vue'
@@ -136,6 +137,11 @@
         :project-state="projectJourney"
         :character-state="characterJourney"
         :selected-character-id="selectedCharacterId"
+        :export-backup="exportBackup"
+        :preview-backup="previewBackup"
+        :apply-backup="applyBackup"
+        :list-backup-archives="listBackupArchives"
+        :restore-backup-archive="restoreBackupArchive"
         :open-project="openProject"
         :show-project-list="showProjectList"
         :open-character="openCharacter"

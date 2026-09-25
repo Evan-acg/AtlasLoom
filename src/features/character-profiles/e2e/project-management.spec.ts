@@ -440,6 +440,80 @@ test('waits for a pending tag mutation before allowing character save', async ({
     await expect(page.getByRole('button', { name: '创建角色' })).toBeEnabled()
 })
 
+// Given a project, character, and tag exist in an isolated data directory
+// When the user exports, cancels an import, then resolves a merge conflict
+// Then the complete backup round-trips without silently overwriting the current record
+test('exports and imports a complete backup with explicit conflict resolution', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '雾港编年', '原始简介')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await createCharacterThroughUi(page, {
+        name: '沈潮生',
+        aliases: '潮生',
+        introduction: '旧港领航员。',
+        tags: ['主角']
+    })
+    await page.getByRole('button', { name: '全部项目' }).click()
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: '导出完整备份' }).click()
+    const download = await downloadPromise
+    const backupPath = await download.path()
+    if (!backupPath) throw new Error('Backup download did not produce a file.')
+    const backup = await readFile(backupPath)
+
+    await page.getByRole('button', { name: '编辑 雾港编年' }).click()
+    await page.getByLabel('项目简介').fill('当前简介')
+    await page.getByRole('button', { name: '保存修改' }).click()
+    await expect(page.getByRole('row', { name: /雾港编年/ })).toContainText('当前简介')
+
+    const fileInput = page.getByLabel('选择备份文件')
+    await fileInput.setInputFiles({ name: 'atlasloom-backup.json', mimeType: 'application/json', buffer: backup })
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('待处理冲突')
+    await expect(dialog.getByRole('button', { name: '确认导入' })).toBeDisabled()
+    await dialog.getByRole('button', { name: '取消' }).first().click()
+    await expect(page.getByRole('row', { name: /雾港编年/ })).toContainText('当前简介')
+
+    await fileInput.setInputFiles({ name: 'atlasloom-backup.json', mimeType: 'application/json', buffer: backup })
+    const conflictChoice = page.locator('select[aria-label*="处理project冲突"]')
+    await conflictChoice.selectOption('use-backup')
+    page.once('dialog', (confirmation) => void confirmation.accept())
+    await dialog.getByRole('button', { name: '确认导入' }).click()
+
+    await expect(page.getByRole('row', { name: /雾港编年/ })).toContainText('原始简介')
+    await page.getByRole('button', { name: '打开 雾港编年' }).click()
+    await expect(page.getByRole('button', { name: '打开 沈潮生' })).toBeVisible()
+    await page.getByRole('button', { name: '打开 沈潮生' }).click()
+    await expect(page.getByText('旧港领航员。')).toBeVisible()
+
+    await page.getByRole('button', { name: '全部项目' }).click()
+    await createProjectThroughUi(page, '临时项目')
+    await fileInput.setInputFiles({ name: 'atlasloom-backup.json', mimeType: 'application/json', buffer: backup })
+    await dialog.getByRole('radio', { name: /替换/ }).check()
+    await expect(dialog).toContainText('将移除')
+    page.once('dialog', (confirmation) => void confirmation.accept())
+    await dialog.getByRole('button', { name: '确认导入' }).click()
+    await expect(page.getByRole('row', { name: /临时项目/ })).toHaveCount(0)
+})
+
+// Given an existing project
+// When the user selects malformed JSON as an import
+// Then the current data remains unchanged and the import cannot be confirmed
+test('rejects malformed backup files without changing current projects', async ({ page, projectApp }) => {
+    await page.goto(projectApp.url)
+    await createProjectThroughUi(page, '现有项目', '保持不变')
+
+    await page.getByLabel('选择备份文件').setInputFiles({
+        name: 'broken.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from('{ broken')
+    })
+    await expect(page.getByRole('alert')).toContainText('不是有效 JSON')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('row', { name: /现有项目/ })).toContainText('保持不变')
+})
+
 async function startApp(): Promise<{ server: ViteDevServer; url: string }> {
     const server = await createServer({
         configFile: resolve(cwd(), 'vite.config.ts'),

@@ -94,6 +94,7 @@ function decodeCharacter(value: unknown, projectId: string): Character {
         typeof value.notes !== 'string' ||
         typeof value.createdAt !== 'string' ||
         typeof value.updatedAt !== 'string' ||
+        (value.deletedAt !== undefined && typeof value.deletedAt !== 'string') ||
         (value.history !== undefined && (!Array.isArray(value.history) || !value.history.every(isHistoryEntry)))
     ) {
         throw new ProjectJsonCodecError('character', 'invalid-fields')
