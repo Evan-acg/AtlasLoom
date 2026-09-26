@@ -25,7 +25,7 @@ Invoke the global `ai-development-workflow` skill before product code changes, t
 
 ## Quality gates
 
-The global workflow's gate contract lives in the global skill's `quality-gates.md`. AtlasLoom implements it with these commands:
+The global workflow's gate contract lives in the global skill's `references/quality-gates.md`. AtlasLoom implements it with these commands:
 
 - **CRAP (Cleaner step)**: run `pnpm test:coverage`, then `pnpm crap:check` to enforce the threshold (`pnpm crap` prints the same report without failing). The threshold is `6`; only production `.ts` files are analyzed.
 - **Mutation testing (Hardener step)**: `pnpm mutation` runs the full local suite. Pull requests gate the changed production `.ts` files with `STRYKER_BREAK=100` (no unjustified surviving mutant); the nightly full run uses the default `break 60`.
