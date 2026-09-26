@@ -15,6 +15,12 @@ export default defineConfig({
     preview: { host: '127.0.0.1' },
     test: {
         include: ['src/**/*.spec.ts'],
-        exclude: ['src/features/character-profiles/e2e/**']
+        exclude: ['src/features/character-profiles/e2e/**'],
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'lcov'],
+            include: ['src/**/*.{ts,vue}'],
+            exclude: ['src/**/*.spec.ts', 'src/**/prototypes/**', 'src/features/character-profiles/e2e/**']
+        }
     }
 })

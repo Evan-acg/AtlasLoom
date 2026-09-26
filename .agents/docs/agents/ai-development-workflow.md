@@ -23,4 +23,15 @@ Invoke the global `ai-development-workflow` skill before product code changes, t
 - Use the scripts in `package.json` for formatting, linting, type-checking, tests, and builds; select the smallest applicable set described by the global workflow.
 - For page or interaction changes, follow the browser and viewport inspection rules recorded in `AGENTS.md` and the repository instructions.
 
+## Quality gates
+
+The global workflow's deterministic gates use these AtlasLoom commands:
+
+- **CRAP (Cleaner step)**: run `pnpm test:coverage`, then `pnpm crap:check` to enforce the threshold (`pnpm crap` prints the same report without failing). The threshold is `6`; only production `.ts` files are analyzed.
+- **Mutation testing (Hardener step)**: `pnpm mutation` runs the full local suite. Pull requests gate the changed production `.ts` files with `STRYKER_BREAK=100` (no unjustified surviving mutant); the nightly full run uses the default `break 60`.
+- **`.vue` scope**: neither gate analyzes `.vue`; their scripts are covered by lint, typecheck, and E2E tests instead.
+- **Ratchet**: gate only the production files the change touches. Every function in a touched file must be within threshold, so pre-existing violations in a touched file must be cleaned with that change; do not widen the scope to silence the gate.
+- **Waivers**: a surviving mutant may only be silenced with an inline Stryker disable comment plus a stated reason. A waiver is itself a reviewable change.
+- **Report**: state the gate command, the scope, and the before/after value alongside the change.
+
 The change is complete only when the global structure review and the applicable AtlasLoom verification evidence are both reported.

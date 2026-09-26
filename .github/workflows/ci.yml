@@ -22,6 +22,8 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
 
             - name: Set up pnpm
               uses: pnpm/action-setup@v4
@@ -40,6 +42,26 @@ jobs:
             - name: Install Playwright browser
               run: pnpm exec playwright install --with-deps chromium
 
+            - name: Determine changed production files
+              id: changed
+              shell: bash
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+                    BASE="origin/${{ github.base_ref }}"
+                  else
+                    BASE="${{ github.event.before }}"
+                  fi
+                  if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+                    BASE="HEAD~1"
+                  fi
+                  CRAP_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE"...HEAD | grep -E '^src/.*\.ts$' | grep -v '\.spec\.ts$' | grep -v '/prototypes/' || true)
+                  {
+                    echo 'crap_files<<EOF'
+                    echo "$CRAP_FILES"
+                    echo 'EOF'
+                  } >> "$GITHUB_OUTPUT"
+
             - name: Lint
               run: pnpm lint
 
@@ -49,5 +71,77 @@ jobs:
             - name: Test
               run: pnpm test
 
+            - name: Coverage
+              run: pnpm test:coverage
+
+            - name: CRAP (changed production files)
+              if: steps.changed.outputs.crap_files != ''
+              shell: bash
+              run: pnpm exec ts-anti-patterns ${{ steps.changed.outputs.crap_files }} --lcov coverage/lcov.info --threshold 6 --fail-above
+
             - name: Build
               run: pnpm build
+
+    mutation:
+        name: mutation
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 11.9.0
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v5
+              with:
+                  node-version: 22.13.0
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Determine changed production files
+              id: changed
+              shell: bash
+              run: |
+                  git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+                  MUTATION_FILES=$(git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}"...HEAD | grep -E '^src/.*\.ts$' | grep -v '\.spec\.ts$' | grep -v '/prototypes/' | grep -v '/e2e/' || true)
+                  {
+                    echo 'mutation_files<<EOF'
+                    echo "$MUTATION_FILES"
+                    echo 'EOF'
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Restore Stryker incremental result
+              if: steps.changed.outputs.mutation_files != ''
+              uses: actions/cache@v4
+              with:
+                  path: reports/stryker-incremental.json
+                  key: stryker-incremental-${{ github.sha }}
+                  restore-keys: |
+                      stryker-incremental-
+
+            - name: Mutation test (changed production files)
+              if: steps.changed.outputs.mutation_files != ''
+              shell: bash
+              env:
+                  STRYKER_BREAK: '100'
+              run: |
+                  FILES=$(echo "${{ steps.changed.outputs.mutation_files }}" | paste -sd, -)
+                  pnpm exec stryker run --mutate "$FILES"
+
+            - name: Upload mutation report
+              if: always() && steps.changed.outputs.mutation_files != ''
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mutation-report
+                  path: reports/
+                  retention-days: 14

@@ -20,7 +20,11 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run && playwright test",
-        "test:watch": "vitest"
+        "test:coverage": "vitest run --coverage",
+        "test:watch": "vitest",
+        "crap": "ts-anti-patterns ./src --lcov coverage/lcov.info --threshold 6 --exclude \"**/*.spec.ts\" --exclude \"**/prototypes/**\" --exclude \"**/e2e/**\"",
+        "crap:check": "ts-anti-patterns ./src --lcov coverage/lcov.info --threshold 6 --fail-above --exclude \"**/*.spec.ts\" --exclude \"**/prototypes/**\" --exclude \"**/e2e/**\"",
+        "mutation": "stryker run"
     },
     "dependencies": {
         "@unocss/reset": "^66.10.5",
@@ -34,7 +38,10 @@
         "@eslint/js": "^10.0.1",
         "@playwright/cli": "^0.1.21",
         "@playwright/test": "^1.63.0",
+        "@stryker-mutator/core": "10.0.0",
+        "@stryker-mutator/vitest-runner": "10.0.0",
         "@vitejs/plugin-vue": "^6.0.9",
+        "@vitest/coverage-v8": "5.0.1",
         "eslint": "^10.11.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-import-resolver-typescript": "^4.4.5",
@@ -45,6 +52,7 @@
         "sass": "^1.105.0",
         "stylelint": "^17.15.0",
         "stylelint-config-standard-scss": "^17.0.0",
+        "ts-anti-patterns": "1.0.3",
         "typescript": "^6.0.3",
         "typescript-eslint": "^8.70.1",
         "unocss": "^66.10.5",

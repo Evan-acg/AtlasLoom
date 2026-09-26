@@ -1,0 +1,55 @@
+name: Mutation nightly
+
+on:
+    schedule:
+        - cron: '0 3 * * *'
+    push:
+        branches:
+            - dev
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    mutation-full:
+        name: mutation-full
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 11.9.0
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v5
+              with:
+                  node-version: 22.13.0
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Restore Stryker incremental result
+              uses: actions/cache@v4
+              with:
+                  path: reports/stryker-incremental.json
+                  key: stryker-incremental-${{ github.sha }}
+                  restore-keys: |
+                      stryker-incremental-
+
+            - name: Mutation test (full)
+              run: pnpm mutation
+
+            - name: Upload mutation report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mutation-full-report
+                  path: reports/
+                  retention-days: 14
