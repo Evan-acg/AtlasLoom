@@ -4,6 +4,9 @@ node_modules/
 # 构建与测试产物
 dist/
 coverage/
+reports/
+.stryker-tmp/
+.ts-anti-patterns-cache/
 
 # 环境变量与本地配置
 .env
